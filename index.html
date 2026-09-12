@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#ecfdf5" />
+<title>Angol szótanuló</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="words.js"></script>
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    background: #ecfdf5;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    box-sizing: border-box;
+  }
+  button {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  /* Use the visible (address-bar aware) viewport height on iOS Safari instead of 100vh,
+     so the layout doesn't jump when the toolbar shows/hides. */
+  .min-h-screen {
+    min-height: 100svh !important;
+  }
+  .ios-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// ---------- helpers ----------
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function parseWordList(raw) {
+  return raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(/\s*[–—]\s*|\s+-\s+|\s*:\s*/);
+      if (parts.length < 2) return null;
+      const en = parts[0].trim();
+      const hu = parts.slice(1).join(" - ").trim();
+      if (!en || !hu) return null;
+      return { en, hu };
+    })
+    .filter(Boolean);
+}
+
+function keyOf(word) {
+  return word.en.toLowerCase();
+}
+
+function ensureProgress(words, progress) {
+  const p = { ...progress };
+  words.forEach((w) => {
+    const k = keyOf(w);
+    if (!p[k]) p[k] = { level: 0, seen: false };
+  });
+  return p;
+}
+
+function getWeakWords(words, progress, threshold = 2) {
+  return words.filter((w) => {
+    const p = progress[keyOf(w)];
+    return p && p.seen && p.level < threshold;
+  });
+}
+
+function pickDistractorWords(words, correct, count) {
+  const others = words.filter((w) => keyOf(w) !== keyOf(correct));
+  return shuffle(others).slice(0, Math.min(count, others.length));
+}
+
+// Letters that are easy to confuse with each other when spelling from memory
+// (visually similar, or the kind of mix-up a Hungarian-speaking kid makes in English).
+const CONFUSABLE = {
+  a: ["e", "o", "u"],
+  b: ["d", "p", "q"],
+  c: ["k", "s", "g"],
+  d: ["b", "p", "q"],
+  e: ["a", "i", "u"],
+  f: ["v", "t"],
+  g: ["j", "c", "q"],
+  h: ["n"],
+  i: ["e", "y", "j"],
+  j: ["g", "y"],
+  k: ["c", "q"],
+  l: ["r", "i"],
+  m: ["n", "w"],
+  n: ["m", "h"],
+  o: ["a", "u"],
+  p: ["b", "q", "d"],
+  q: ["g", "p"],
+  r: ["l"],
+  s: ["c", "z"],
+  t: ["d", "f"],
+  u: ["a", "o", "v"],
+  v: ["w", "f", "u"],
+  w: ["v", "m"],
+  x: ["z", "s"],
+  y: ["i", "j"],
+  z: ["s", "x"],
+};
+
+function pickLetterOptions(correctChar) {
+  const c = correctChar.toLowerCase();
+  const alphabet = "abcdefghijklmnopqrstuvwxyz".split("");
+  const similar = shuffle((CONFUSABLE[c] || []).filter((l) => l !== c));
+  const rest = shuffle(alphabet.filter((l) => l !== c && !similar.includes(l)));
+  const distractors = [...similar, ...rest].slice(0, 3);
+  return shuffle([c, ...distractors]);
+}
+
+function pickBlankIndices(word, level) {
+  const chars = word.en.split("");
+  const eligible = [];
+  chars.forEach((ch, i) => {
+    if (ch !== " " && i !== 0) eligible.push(i);
+  });
+  const pool = eligible.length > 0 ? eligible : chars.map((_, i) => i).filter((i) => chars[i] !== " ");
+  const nonSpaceLen = chars.filter((c) => c !== " ").length;
+  let count = nonSpaceLen <= 5 ? 1 : 2;
+  if (level >= 3) count = Math.min(count + 1, pool.length);
+  count = Math.max(1, Math.min(count, pool.length));
+  return shuffle(pool).slice(0, count).sort((a, b) => a - b);
+}
+
+function buildPracticeQueue(pool, progress) {
+  if (!pool || pool.length === 0) return [];
+  let items = [];
+  pool.forEach((w) => {
+    const lvl = progress[keyOf(w)]?.level ?? 0;
+    const weight = Math.max(1, 6 - lvl);
+    for (let i = 0; i < weight; i++) items.push(w);
+  });
+  items = shuffle(items);
+  for (let i = 1; i < items.length; i++) {
+    if (keyOf(items[i]) === keyOf(items[i - 1])) {
+      const j = (i + 3) % items.length;
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+  }
+  const size = Math.max(8, Math.min(20, Math.round(pool.length * 1.6)));
+  return items.slice(0, Math.min(size, items.length));
+}
+
+// ---------- theme ----------
+
+const LIGHT = {
+  page: "bg-emerald-50",
+  card: "bg-white border-emerald-100",
+  heading: "text-stone-800",
+  muted: "text-stone-500",
+  faint: "text-stone-400",
+  textarea: "bg-white border-stone-300 text-stone-800 focus:ring-emerald-400",
+  optionBase: "bg-white border-stone-300 text-stone-700 hover:bg-stone-50",
+  optionCorrect: "bg-emerald-100 border-emerald-500 text-emerald-800",
+  optionWrong: "bg-rose-100 border-rose-400 text-rose-700",
+  optionNeutralSel: "bg-stone-200 border-stone-300 text-stone-700",
+  blankLine: "border-stone-400",
+  blankChar: "text-stone-800",
+  activeBlank: "bg-amber-100 border-2 border-amber-400 text-amber-700",
+  score: "text-emerald-700",
+  toggle: "bg-white border-stone-300 text-stone-600 hover:bg-stone-50",
+  dotEmpty: "bg-stone-200",
+  btn: {
+    primary: "bg-emerald-700 hover:bg-emerald-800 text-white",
+    ghost: "bg-white hover:bg-stone-50 text-stone-700 border border-stone-300",
+    subtle: "bg-stone-100 hover:bg-stone-200 text-stone-600",
+  },
+};
+
+const DARK = {
+  page: "bg-stone-950",
+  card: "bg-stone-900 border-stone-700",
+  heading: "text-stone-100",
+  muted: "text-stone-400",
+  faint: "text-stone-500",
+  textarea: "bg-stone-800 border-stone-600 text-stone-100 focus:ring-emerald-500",
+  optionBase: "bg-stone-800 border-stone-600 text-stone-200 hover:bg-stone-700",
+  optionCorrect: "bg-emerald-900 border-emerald-500 text-emerald-300",
+  optionWrong: "bg-rose-900 border-rose-500 text-rose-300",
+  optionNeutralSel: "bg-stone-700 border-stone-600 text-stone-200",
+  blankLine: "border-stone-500",
+  blankChar: "text-stone-100",
+  activeBlank: "bg-amber-900/40 border-2 border-amber-500 text-amber-300",
+  score: "text-emerald-400",
+  toggle: "bg-stone-800 border-stone-600 text-stone-200 hover:bg-stone-700",
+  dotEmpty: "bg-stone-700",
+  btn: {
+    primary: "bg-emerald-600 hover:bg-emerald-500 text-white",
+    ghost: "bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-600",
+    subtle: "bg-stone-700 hover:bg-stone-600 text-stone-200",
+  },
+};
+
+// ---------- storage ----------
+
+async function loadData() {
+  let words = null;
+  let progress = {};
+  let theme = "light";
+  try {
+    const w = localStorage.getItem("wordlist");
+    if (w) words = JSON.parse(w);
+  } catch (e) {}
+  try {
+    const p = localStorage.getItem("progress");
+    if (p) progress = JSON.parse(p);
+  } catch (e) {}
+  try {
+    const th = localStorage.getItem("theme");
+    if (th) theme = th;
+  } catch (e) {}
+  return { words, progress, theme };
+}
+
+async function saveWords(words) {
+  try {
+    localStorage.setItem("wordlist", JSON.stringify(words));
+  } catch (e) {}
+}
+
+async function saveProgress(progress) {
+  try {
+    localStorage.setItem("progress", JSON.stringify(progress));
+  } catch (e) {}
+}
+
+async function saveTheme(theme) {
+  try {
+    localStorage.setItem("theme", theme);
+  } catch (e) {}
+}
+
+// ---------- UI bits ----------
+
+function BigButton({ children, onClick, tone = "primary", disabled, t }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full rounded-2xl py-4 px-5 text-lg font-semibold transition-colors disabled:opacity-40 ${t.btn[tone]}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Shell({ children, t, dark, onToggle, onClose }) {
+  return (
+    <div className={`min-h-screen ${t.page} flex items-center justify-center p-4 transition-colors`}>
+      <div className="w-full max-w-md">
+        <div className="flex justify-between items-center mb-2">
+          {onClose ? (
+            <button
+              onClick={onClose}
+              aria-label="Vissza a főmenübe"
+              className={`text-base leading-none rounded-full w-7 h-7 flex items-center justify-center transition-colors ${t.faint} hover:opacity-70`}
+            >
+              ✕
+            </button>
+          ) : (
+            <span />
+          )}
+          <button
+            onClick={onToggle}
+            className={`text-xs rounded-full border px-3 py-1.5 transition-colors ${t.toggle}`}
+          >
+            {dark ? "☀️ Világos mód" : "🌙 Sötét mód"}
+          </button>
+        </div>
+        <div className={`rounded-3xl shadow-sm border p-6 sm:p-8 transition-colors ${t.card}`}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function LevelDots({ level, t }) {
+  return (
+    <div className="flex gap-1 shrink-0">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <span key={i} className={`w-2.5 h-2.5 rounded-full ${i < level ? "bg-emerald-500" : t.dotEmpty}`} />
+      ))}
+    </div>
+  );
+}
+
+// ---------- main component ----------
+
+function VocabTrainer() {
+  const [screen, setScreen] = useState("loading"); // loading, setup, menu, practice, practiceEnd, exam, examEnd, progressView
+  const [words, setWords] = useState([]);
+  const [progress, setProgress] = useState({});
+  const [setupText, setSetupText] = useState("");
+  const [dark, setDark] = useState(false);
+  const t = dark ? DARK : LIGHT;
+
+  // session state
+  const [sessionType, setSessionType] = useState("practice"); // practice, quick, exam
+  const [queue, setQueue] = useState([]);
+  const [qIndex, setQIndex] = useState(0);
+  const [stage, setStage] = useState("intro"); // intro, recall, spelling
+  const [direction, setDirection] = useState("hu2en"); // hu2en, en2hu
+  const [recallOptions, setRecallOptions] = useState([]);
+  const [recallSelected, setRecallSelected] = useState(null);
+  const [recallOk, setRecallOk] = useState(null);
+  const [blankIdx, setBlankIdx] = useState([]);
+  const [blankPos, setBlankPos] = useState(0);
+  const [filled, setFilled] = useState({});
+  const [letterOptions, setLetterOptions] = useState([]);
+  const [letterSelected, setLetterSelected] = useState(null);
+  const [letterOk, setLetterOk] = useState(null);
+  const [spellAllCorrect, setSpellAllCorrect] = useState(true);
+  const [missed, setMissed] = useState([]); // {en, hu}
+  const [isExam, setIsExam] = useState(false);
+  const [examTotal, setExamTotal] = useState(0);
+  const [examCorrect, setExamCorrect] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      const { words: w, progress: p, theme } = await loadData();
+      setDark(theme === "dark");
+      if (w && w.length > 0) {
+        setWords(w);
+        setProgress(ensureProgress(w, p));
+        setScreen("menu");
+      } else {
+        const defaults = parseWordList(window.DEFAULT_WORDS_TEXT || "");
+        if (defaults.length > 0) {
+          const dp = ensureProgress(defaults, {});
+          setWords(defaults);
+          setProgress(dp);
+          saveWords(defaults);
+          saveProgress(dp);
+          setScreen("menu");
+        } else {
+          setScreen("setup");
+        }
+      }
+    })();
+  }, []);
+
+  // Keep the Safari status bar / home-screen icon color in sync with light/dark mode.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", dark ? "#0c0a09" : "#ecfdf5");
+  }, [dark]);
+
+  function toggleDark() {
+    setDark((prev) => {
+      const next = !prev;
+      saveTheme(next ? "dark" : "light");
+      return next;
+    });
+  }
+
+  function startTurn(word, forcedStage) {
+    const seen = progress[keyOf(word)]?.seen;
+    const lvl = progress[keyOf(word)]?.level ?? 0;
+    const st = forcedStage || (!isExam && !seen ? "intro" : "recall");
+    const dir = Math.random() < 0.5 ? "hu2en" : "en2hu";
+    setDirection(dir);
+    setStage(st);
+    setRecallSelected(null);
+    setRecallOk(null);
+    setLetterSelected(null);
+    setLetterOk(null);
+    setSpellAllCorrect(true);
+    setFilled({});
+    setBlankPos(0);
+
+    if (st === "recall" || st === "intro") {
+      const distractors = pickDistractorWords(words, word, 3);
+      setRecallOptions(shuffle([word, ...distractors]));
+    }
+    if (st === "spelling") {
+      const idxs = pickBlankIndices(word, lvl);
+      setBlankIdx(idxs);
+      setLetterOptions(pickLetterOptions(word.en[idxs[0]]));
+    }
+  }
+
+  function beginSession(type) {
+    const exam = type === "exam";
+    setSessionType(type);
+    setIsExam(exam);
+    setMissed([]);
+    setExamTotal(0);
+    setExamCorrect(0);
+    const pool = type === "quick" ? getWeakWords(words, progress) : words;
+    const q = exam ? shuffle(pool) : buildPracticeQueue(pool, progress);
+    if (q.length === 0) return;
+    setQueue(q);
+    setQIndex(0);
+    setScreen(exam ? "exam" : "practice");
+    startTurn(q[0], exam ? "recall" : undefined);
+  }
+
+  const currentWord = queue[qIndex];
+
+  function handleIntroNext() {
+    setStage("recall");
+    const distractors = pickDistractorWords(words, currentWord, 3);
+    setRecallOptions(shuffle([currentWord, ...distractors]));
+  }
+
+  function handleRecallPick(opt) {
+    if (recallSelected) return;
+    setRecallSelected(opt);
+    if (!isExam) setRecallOk(keyOf(opt) === keyOf(currentWord));
+    else setRecallOk(null);
+  }
+
+  function goToSpelling() {
+    const lvl = progress[keyOf(currentWord)]?.level ?? 0;
+    const idxs = pickBlankIndices(currentWord, lvl);
+    setBlankIdx(idxs);
+    setBlankPos(0);
+    setFilled({});
+    setLetterSelected(null);
+    setLetterOk(null);
+    setLetterOptions(pickLetterOptions(currentWord.en[idxs[0]]));
+    setStage("spelling");
+  }
+
+  function handleLetterPick(letter) {
+    if (letterSelected) return;
+    setLetterSelected(letter);
+    const idx = blankIdx[blankPos];
+    const correctChar = currentWord.en[idx].toLowerCase();
+    const ok = letter === correctChar;
+    if (!isExam) {
+      setLetterOk(ok);
+      if (!ok) setSpellAllCorrect(false);
+      setFilled((f) => ({ ...f, [idx]: correctChar }));
+    } else {
+      setLetterOk(null);
+      if (!ok) setSpellAllCorrect(false);
+      setFilled((f) => ({ ...f, [idx]: letter }));
+    }
+  }
+
+  function nextBlankOrFinish() {
+    const nextPos = blankPos + 1;
+    if (nextPos < blankIdx.length) {
+      setBlankPos(nextPos);
+      setLetterSelected(null);
+      setLetterOk(null);
+      setLetterOptions(pickLetterOptions(currentWord.en[blankIdx[nextPos]]));
+    } else {
+      finishWord();
+    }
+  }
+
+  function finishWord() {
+    const wasRecallCorrect = isExam ? keyOf(recallSelected) === keyOf(currentWord) : recallOk === true;
+    const wasFullyCorrect = wasRecallCorrect && spellAllCorrect;
+    const k = keyOf(currentWord);
+
+    setProgress((prev) => {
+      const cur = prev[k] || { level: 0, seen: false };
+      const level = wasFullyCorrect ? Math.min(5, cur.level + 1) : Math.max(0, cur.level - 1);
+      const updated = { ...prev, [k]: { level, seen: true } };
+      saveProgress(updated);
+      return updated;
+    });
+
+    if (isExam) {
+      setExamTotal((tt) => tt + 1);
+      if (wasFullyCorrect) setExamCorrect((c) => c + 1);
+      else setMissed((m) => [...m, currentWord]);
+    } else if (!wasFullyCorrect) {
+      setMissed((m) => (m.find((x) => keyOf(x) === k) ? m : [...m, currentWord]));
+    }
+
+    advanceQueue(!wasFullyCorrect && !isExam);
+  }
+
+  function advanceQueue(requeue) {
+    setQueue((q) => {
+      let newQ = q;
+      if (requeue) {
+        const insertAt = Math.min(qIndex + 3, newQ.length);
+        newQ = [...newQ.slice(0, insertAt), currentWord, ...newQ.slice(insertAt)];
+      }
+      const nextIdx = qIndex + 1;
+      if (nextIdx >= newQ.length) {
+        setScreen(isExam ? "examEnd" : "practiceEnd");
+      } else {
+        setQIndex(nextIdx);
+        setTimeout(() => startTurn(newQ[nextIdx]), 0);
+      }
+      return newQ;
+    });
+  }
+
+  function handleSetupSave() {
+    const parsed = parseWordList(setupText);
+    if (parsed.length === 0) return;
+    setWords(parsed);
+    const p = ensureProgress(parsed, {});
+    setProgress(p);
+    saveWords(parsed);
+    saveProgress(p);
+    setScreen("menu");
+  }
+
+  function openWordListEditor() {
+    setSetupText(words.map((w) => `${w.en} – ${w.hu}`).join("\n"));
+    setScreen("setup");
+  }
+
+  function handleResetProgress() {
+    const ok = window.confirm("Biztosan törlöd az eddigi haladást? A szólista megmarad, de minden szó újra kezdő szintre áll.");
+    if (!ok) return;
+    const fresh = ensureProgress(words, {});
+    setProgress(fresh);
+    saveProgress(fresh);
+  }
+
+  // ---------- render ----------
+
+  if (screen === "loading") {
+    return (
+      <Shell t={t} dark={dark} onToggle={toggleDark}>
+        <p className={`text-center ${t.muted}`}>Betöltés…</p>
+      </Shell>
+    );
+  }
+
+  if (screen === "setup") {
+    return (
+      <Shell t={t} dark={dark} onToggle={toggleDark}>
+        <h1 className={`text-2xl font-serif mb-1 ${t.heading}`}>Szólista</h1>
+        <p className={`text-sm mb-4 ${t.muted}`}>
+          Minden sorba egy szót írj, ilyen formában: <span className="font-mono">angol – magyar</span>
+        </p>
+        <textarea
+          value={setupText}
+          onChange={(e) => setSetupText(e.target.value)}
+          rows={10}
+          placeholder={"suitcase – bőrönd\nstormy – viharos\nappeared – megjelent"}
+          className={`w-full rounded-xl border p-3 font-mono text-base mb-4 focus:outline-none focus:ring-2 ${t.textarea}`}
+        />
+        <BigButton t={t} onClick={handleSetupSave}>
+          Mentés és kezdés
+        </BigButton>
+        {words.length > 0 && (
+          <button onClick={() => setScreen("menu")} className={`mt-3 w-full text-center text-sm ${t.faint}`}>
+            Mégse
+          </button>
+        )}
+      </Shell>
+    );
+  }
+
+  if (screen === "menu") {
+    const weakWords = getWeakWords(words, progress);
+    return (
+      <Shell t={t} dark={dark} onToggle={toggleDark}>
+        <div className="flex justify-between items-start mb-6">
+          <h1 className={`text-2xl font-serif ${t.heading}`}>Angol szótanuló</h1>
+          <div className="flex gap-3 mt-1">
+            <button onClick={openWordListEditor} className={`text-xs ${t.faint}`}>
+              szólista
+            </button>
+            <button onClick={() => setScreen("progressView")} className={`text-xs ${t.faint}`}>
+              haladás
+            </button>
+          </div>
+        </div>
+        <p className={`mb-6 ${t.muted}`}>{words.length} szó a listában</p>
+        <div className="space-y-3">
+          <BigButton t={t} onClick={() => beginSession("practice")}>
+            Gyakorlás
+          </BigButton>
+          <BigButton t={t} tone="subtle" disabled={weakWords.length === 0} onClick={() => beginSession("quick")}>
+            {weakWords.length > 0 ? `Gyors ismétlés (${weakWords.length})` : "Gyors ismétlés"}
+          </BigButton>
+          <BigButton t={t} onClick={() => beginSession("exam")} tone="ghost">
+            Dolgozat mód
+          </BigButton>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "progressView") {
+    const sorted = [...words].sort(
+      (a, b) => (progress[keyOf(a)]?.level ?? 0) - (progress[keyOf(b)]?.level ?? 0)
+    );
+    const masteredCount = words.filter((w) => (progress[keyOf(w)]?.level ?? 0) >= 4).length;
+    return (
+      <Shell t={t} dark={dark} onToggle={toggleDark}>
+        <h2 className={`text-2xl font-serif mb-1 ${t.heading}`}>Haladás</h2>
+        <p className={`text-sm mb-5 ${t.muted}`}>
+          {masteredCount} / {words.length} szó megy már magabiztosan
+        </p>
+        <div className="space-y-3 max-h-96 overflow-y-auto pr-1 mb-5 ios-scroll">
+          {sorted.map((w) => {
+            const lvl = progress[keyOf(w)]?.level ?? 0;
+            return (
+              <div key={keyOf(w)} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={`text-sm font-medium truncate ${t.heading}`}>{w.en}</p>
+                  <p className={`text-xs truncate ${t.faint}`}>{w.hu}</p>
+                </div>
+                <LevelDots level={lvl} t={t} />
+              </div>
+            );
+          })}
+        </div>
+        <div className="space-y-2">
+          <BigButton t={t} tone="ghost" onClick={() => setScreen("menu")}>
+            Vissza
+          </BigButton>
+          <button
+            onClick={handleResetProgress}
+            className="w-full text-center text-xs text-rose-500 hover:text-rose-600 pt-1"
+          >
+            Haladás visszaállítása
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  if ((screen === "practice" || screen === "exam") && currentWord) {
+    const progressLabel = `${qIndex + 1} / ${queue.length}`;
+    const modeLabel = sessionType === "exam" ? "Dolgozat mód" : sessionType === "quick" ? "Gyors ismétlés" : "Gyakorlás";
+    const promptText = direction === "hu2en" ? currentWord.hu : currentWord.en;
+    const promptLabel = direction === "hu2en" ? "Melyik szó jelenti ezt?" : "Mit jelent ez a szó?";
+
+    return (
+      <Shell t={t} dark={dark} onToggle={toggleDark} onClose={() => setScreen("menu")}>
+        <div className="flex justify-between items-center mb-6">
+          <span className={`text-xs ${t.faint}`}>{modeLabel}</span>
+          <span className={`text-xs ${t.faint}`}>{progressLabel}</span>
+        </div>
+
+        {stage === "intro" && (
+          <div className="text-center py-6">
+            <p className={`font-serif text-4xl mb-3 tracking-wide ${t.heading}`}>{currentWord.en}</p>
+            <p className={`text-xl mb-8 ${t.muted}`}>{currentWord.hu}</p>
+            <BigButton t={t} onClick={handleIntroNext}>
+              Tovább
+            </BigButton>
+          </div>
+        )}
+
+        {stage === "recall" && (
+          <div className="py-2">
+            <p className={`mb-2 text-center text-sm ${t.muted}`}>{promptLabel}</p>
+            <p className={`font-serif text-3xl mb-6 text-center ${t.heading}`}>{promptText}</p>
+            <div className="grid grid-cols-1 gap-3 mb-4">
+              {recallOptions.map((opt) => {
+                const isSel = recallSelected && keyOf(opt) === keyOf(recallSelected);
+                let cls = t.optionBase;
+                if (isSel) {
+                  cls = isExam ? t.optionNeutralSel : recallOk ? t.optionCorrect : t.optionWrong;
+                }
+                return (
+                  <button
+                    key={keyOf(opt)}
+                    onClick={() => handleRecallPick(opt)}
+                    disabled={!!recallSelected}
+                    className={`w-full rounded-2xl py-3 px-4 text-lg font-medium border transition-colors disabled:opacity-100 ${cls}`}
+                  >
+                    {direction === "hu2en" ? opt.en : opt.hu}
+                  </button>
+                );
+              })}
+            </div>
+            {recallSelected && (
+              <BigButton t={t} onClick={goToSpelling}>
+                Következő
+              </BigButton>
+            )}
+          </div>
+        )}
+
+        {stage === "spelling" && (
+          <div className="py-2">
+            <p className={`mb-4 text-center text-sm ${t.muted}`}>
+              Melyik betű hiányzik?
+              {blankIdx.length > 1 && (
+                <span className={`ml-1 ${t.faint}`}>
+                  ({blankPos + 1}/{blankIdx.length})
+                </span>
+              )}
+            </p>
+            <div className="flex justify-center flex-wrap gap-1 mb-8">
+              {currentWord.en.split("").map((ch, i) => {
+                if (ch === " ") return <span key={i} className="w-3" />;
+                const isBlank = blankIdx.includes(i);
+                const isActive = isBlank && i === blankIdx[blankPos] && filled[i] === undefined;
+                const shown = isBlank ? filled[i] || null : ch;
+                return (
+                  <span
+                    key={i}
+                    className={`w-8 h-10 flex items-center justify-center font-mono text-2xl rounded-md transition-colors ${
+                      isActive ? t.activeBlank : `border-b-2 ${t.blankLine} ${t.blankChar}`
+                    }`}
+                  >
+                    {shown || (isBlank ? "_" : ch)}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {letterOptions.map((l) => {
+                const isSel = letterSelected === l;
+                let cls = t.optionBase;
+                if (isSel) {
+                  cls = isExam ? t.optionNeutralSel : letterOk ? t.optionCorrect : t.optionWrong;
+                }
+                return (
+                  <button
+                    key={l}
+                    onClick={() => handleLetterPick(l)}
+                    disabled={!!letterSelected}
+                    className={`rounded-xl py-3 text-xl font-semibold border disabled:opacity-100 ${cls}`}
+                  >
+                    {l}
+                  </button>
+                );
+              })}
+            </div>
+            {letterSelected && (
+              <BigButton t={t} onClick={nextBlankOrFinish}>
+                Következő
+              </BigButton>
+            )}
+          </div>
+        )}
+      </Shell>
+    );
+  }
+
+  if (screen === "practiceEnd") {
+    return (
+      <Shell t={t} dark={dark} onToggle={toggleDark}>
+        <h2 className={`text-2xl font-serif mb-3 ${t.heading}`}>
+          {sessionType === "quick" ? "Kész a gyors ismétléssel!" : "Kész a gyakorlás!"}
+        </h2>
+        <p className={`mb-6 ${t.muted}`}>{queue.length} szót néztetek át.</p>
+        {missed.length > 0 && (
+          <div className="mb-6">
+            <p className={`text-sm mb-2 ${t.muted}`}>Ezekre még érdemes figyelni:</p>
+            <ul className={`space-y-1 ${t.heading}`}>
+              {missed.map((w) => (
+                <li key={keyOf(w)} className="text-sm">
+                  <span className="font-medium">{w.en}</span> – {w.hu}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <BigButton t={t} onClick={() => setScreen("menu")}>
+          Vissza
+        </BigButton>
+      </Shell>
+    );
+  }
+
+  if (screen === "examEnd") {
+    return (
+      <Shell t={t} dark={dark} onToggle={toggleDark}>
+        <h2 className={`text-2xl font-serif mb-3 ${t.heading}`}>Dolgozat eredménye</h2>
+        <p className={`text-4xl font-serif mb-6 ${t.score}`}>
+          {examCorrect} / {examTotal}
+        </p>
+        {missed.length > 0 ? (
+          <div className="mb-6">
+            <p className={`text-sm mb-2 ${t.muted}`}>Bizonytalan szavak:</p>
+            <ul className={`space-y-1 ${t.heading}`}>
+              {missed.map((w) => (
+                <li key={keyOf(w)} className="text-sm">
+                  <span className="font-medium">{w.en}</span> – {w.hu}
+                </li>
+              ))}
+            </ul>
+            <p className={`text-xs mt-3 ${t.faint}`}>Ezek automatikusan visszakerülnek a következő gyakorlásba.</p>
+          </div>
+        ) : (
+          <p className={`mb-6 ${t.muted}`}>Minden szót tudtál! 🎉</p>
+        )}
+        <BigButton t={t} onClick={() => setScreen("menu")}>
+          Vissza
+        </BigButton>
+      </Shell>
+    );
+  }
+
+  return null;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<VocabTrainer />);
+</script>
+</body>
+</html>
