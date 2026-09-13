@@ -18,6 +18,7 @@ There's also a separate **Exam mode**: no hints, no color feedback, just a final
 
 - `index.html` — the app itself (React + Tailwind, loaded from a CDN — no build step, no install)
 - `words.js` — the default word list, loaded automatically the first time the app runs on a device, as long as nothing has been saved yet
+- `manifest.json`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `favicon.ico`, `favicon-32.png` — the app icon (a little green monkey) and metadata used when the app is added to a phone's home screen or shown in a browser tab
 
 ## Editing the word list
 
@@ -35,7 +36,7 @@ suitcase – bőrönd
 
 This is a static site with no build step. To host it on GitHub Pages:
 
-1. Push `index.html` and `words.js` to this repository.
+1. Push `index.html`, `words.js`, `manifest.json`, and all the `icon-*` / `apple-touch-icon.png` / `favicon*` files to this repository.
 2. Go to **Settings → Pages**.
 3. Under **Branch**, select `main` and `/ (root)`, then save.
 4. The app will be live at `https://<your-username>.github.io/<repo-name>/`.

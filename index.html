@@ -6,7 +6,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="theme-color" content="#ecfdf5" />
+<meta name="apple-mobile-web-app-title" content="Szótanuló" />
+<meta name="theme-color" content="#0ea5e9" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+<link rel="icon" href="favicon.ico" />
 <title>Angol szótanuló</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -22,7 +28,7 @@
   body {
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
-    background: #ecfdf5;
+    background: #f0f9ff;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
@@ -50,6 +56,90 @@
 
 <script type="text/babel">
 const { useState, useEffect } = React;
+
+// ---------- mascot copy ----------
+
+const MENU_GREETINGS = [
+  "Szia majom-pajtás! Készen állsz banánkeményen gyakorolni? 🐵🍌",
+  "Húzzunk fel egy fára, és tanuljunk pár szót!",
+  "Gyere, majmoljuk be együtt ezt a szólistát!",
+  "Szia! Mi, majmok, imádunk szavakat gyűjteni. Kezdjünk bele!",
+  "Helló! A dzsungel vár, de előbb gyakoroljunk egy kicsit.",
+  "Pszt... hallom, hogy egy banán szótanulásra vár! 🍌",
+  "Kész vagy egy kis majomerős gyakorlásra?",
+  "Szia! Ugorjunk neki, mint majom a liánról a liánra!",
+  "Ma is szótanuló majmok vagyunk, ugye?",
+  "Helló, majom-cimbora! Irány a szavak dzsungele!",
+  "Szia! Ma is banánért gyakorlunk, vagy csak úgy, kedvből?",
+  "Kapaszkodj, indulunk felfelé a szótudás fáján!",
+];
+
+const SETUP_MESSAGES = [
+  "Én is egy tanulós majom vagyok — dobd be a szavakat!",
+  "Add ide a szólistát, majd én elrendezem a fán!",
+  "Egy majomnak sosem elég a szó — gyere, gyűjtsünk még!",
+  "Ide a szavakkal, és irány a dzsungel iskolája!",
+];
+
+const CORRECT_MESSAGES = [
+  "Majomügyes vagy! 🐵",
+  "Ez banánérő teljesítmény! 🍌",
+  "Szuper, igazi szótanuló majom vagy!",
+  "Ezt még egy vén hegyi majom is megirigyelné!",
+  "Ez az! Egyenesen a fa tetejére ezzel!",
+  "Pontos, mint egy majom ugrása liánról liánra!",
+  "Ezt profi módon majmoltad le!",
+  "Banánosztás mindenkinek, ez nagyon jó volt!",
+  "Nagyon jó! Már majdnem majom-mester vagy!",
+  "Szuperszem, semmi nem kerüli el a figyelmedet!",
+  "Ez az igazi majomtudás!",
+  "Ügyes vagy, mint egy majom a fán!",
+];
+const WRONG_MESSAGES = [
+  "Semmi baj, még én is leesek néha egy fáról!",
+  "Ez egy trükkös szó, még a legügyesebb majom is elgondolkodik rajta!",
+  "Majdnem! Egy banánt azért kapsz próbálkozásért 🍌",
+  "Nem baj, majmocskám, gyakoroljuk még egy kicsit!",
+  "Ez a szó még kúszik-mászik, de hamarosan megvan!",
+  "Ejnye, ez most kicsúszott, mint egy csúszós banánhéj!",
+  "Semmi gond, mindenki elvéti néha egy ágat!",
+  "Ez most nem sikerült, de a majmok sosem adják fel!",
+  "Kicsit még gyakoroljuk, aztán liánról liánra repülünk!",
+  "Ejha, ez nehéz volt! Nézzük meg együtt még egyszer.",
+];
+
+const PRACTICE_PERFECT_MESSAGES = [
+  "Ez maga volt a majom-mesterfokozat! 🎉🐵",
+  "Vau, minden szót bezsebeltél, mint egy fürge majom a banánt!",
+  "Tökéletes! Ma te vagy a dzsungel királya!",
+  "Ezt nevezem majomügyességnek! Minden szó megvan!",
+];
+const PRACTICE_GOOD_MESSAGES = [
+  "Szép munka, majom-pajtás! Ezekre még figyeljünk:",
+  "Ez már egész jó volt! Még pár szóra hajtsunk rá:",
+  "Ügyes voltál! Csak ezek szorulnak még gyakorlásra:",
+  "Majdnem tökéletes! Ezeket nézzük át még egyszer:",
+];
+
+const EXAM_PERFECT_MESSAGES = [
+  "Fantasztikus, igazi szótanuló majom vagy! 🎉",
+  "Ez maga volt a majom-Nobel-díj! Minden szó megvan!",
+  "Hihetetlen, egy szót sem hibáztál! 🐒🎉",
+];
+const EXAM_GOOD_MESSAGES = [
+  "Ez már egy majomügyes dolgozat lenne!",
+  "Szép eredmény, már majdnem majom-mester szinten vagy!",
+  "Ügyes voltál, csak pár szó szorul még gyakorlásra!",
+];
+const EXAM_PRACTICE_MESSAGES = [
+  "Ezeket még gyakoroljuk — még a legügyesebb majom is tanul minden nap!",
+  "Semmi baj, mindenki innen indul — gyakoroljunk még egy kicsit!",
+  "Ez még nem ment annyira, de a majmok kitartóak! Nézzük át együtt.",
+];
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
 // ---------- helpers ----------
 
@@ -179,50 +269,66 @@ function buildPracticeQueue(pool, progress) {
 // ---------- theme ----------
 
 const LIGHT = {
-  page: "bg-emerald-50",
-  card: "bg-white border-emerald-100",
-  heading: "text-stone-800",
-  muted: "text-stone-500",
-  faint: "text-stone-400",
-  textarea: "bg-white border-stone-300 text-stone-800 focus:ring-emerald-400",
-  optionBase: "bg-white border-stone-300 text-stone-700 hover:bg-stone-50",
-  optionCorrect: "bg-emerald-100 border-emerald-500 text-emerald-800",
+  page: "bg-sky-50",
+  card: "bg-white border-sky-100",
+  heading: "text-slate-800",
+  muted: "text-slate-500",
+  faint: "text-slate-400",
+  textarea: "bg-white border-slate-300 text-slate-800 focus:ring-lime-400",
+  optionBase: "bg-white border-slate-300 text-slate-700 hover:bg-slate-50",
+  optionCorrect: "bg-lime-100 border-lime-500 text-lime-800",
   optionWrong: "bg-rose-100 border-rose-400 text-rose-700",
-  optionNeutralSel: "bg-stone-200 border-stone-300 text-stone-700",
-  blankLine: "border-stone-400",
-  blankChar: "text-stone-800",
+  optionNeutralSel: "bg-slate-200 border-slate-300 text-slate-700",
+  blankLine: "border-slate-400",
+  blankChar: "text-slate-800",
   activeBlank: "bg-amber-100 border-2 border-amber-400 text-amber-700",
-  score: "text-emerald-700",
-  toggle: "bg-white border-stone-300 text-stone-600 hover:bg-stone-50",
-  dotEmpty: "bg-stone-200",
+  score: "text-lime-600",
+  toggle: "bg-white border-slate-300 text-slate-600 hover:bg-slate-50",
+  dotEmpty: "bg-slate-200",
+  catWeak: "text-rose-600",
+  catMid: "text-amber-600",
+  catGood: "text-lime-600",
+  progressTrack: "bg-slate-200",
+  progressFill: "bg-lime-500",
+  mascotBubble: "bg-white border-slate-200 text-slate-700",
+  metaColor: "#f0f9ff",
   btn: {
-    primary: "bg-emerald-700 hover:bg-emerald-800 text-white",
-    ghost: "bg-white hover:bg-stone-50 text-stone-700 border border-stone-300",
-    subtle: "bg-stone-100 hover:bg-stone-200 text-stone-600",
+    primary: "bg-lime-500 hover:bg-lime-400 active:translate-y-1 text-white border-b-4 border-lime-700",
+    secondary: "bg-sky-500 hover:bg-sky-400 active:translate-y-1 text-white border-b-4 border-sky-700",
+    subtle: "bg-amber-400 hover:bg-amber-300 active:translate-y-1 text-amber-950 border-b-4 border-amber-600",
+    ghost: "bg-white hover:bg-slate-50 text-slate-700 border-2 border-slate-300 active:translate-y-1",
   },
 };
 
 const DARK = {
-  page: "bg-stone-950",
-  card: "bg-stone-900 border-stone-700",
-  heading: "text-stone-100",
-  muted: "text-stone-400",
-  faint: "text-stone-500",
-  textarea: "bg-stone-800 border-stone-600 text-stone-100 focus:ring-emerald-500",
-  optionBase: "bg-stone-800 border-stone-600 text-stone-200 hover:bg-stone-700",
-  optionCorrect: "bg-emerald-900 border-emerald-500 text-emerald-300",
+  page: "bg-slate-950",
+  card: "bg-slate-900 border-slate-700",
+  heading: "text-slate-100",
+  muted: "text-slate-400",
+  faint: "text-slate-500",
+  textarea: "bg-slate-800 border-slate-600 text-slate-100 focus:ring-lime-500",
+  optionBase: "bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-700",
+  optionCorrect: "bg-lime-900 border-lime-500 text-lime-300",
   optionWrong: "bg-rose-900 border-rose-500 text-rose-300",
-  optionNeutralSel: "bg-stone-700 border-stone-600 text-stone-200",
-  blankLine: "border-stone-500",
-  blankChar: "text-stone-100",
+  optionNeutralSel: "bg-slate-700 border-slate-600 text-slate-200",
+  blankLine: "border-slate-500",
+  blankChar: "text-slate-100",
   activeBlank: "bg-amber-900/40 border-2 border-amber-500 text-amber-300",
-  score: "text-emerald-400",
-  toggle: "bg-stone-800 border-stone-600 text-stone-200 hover:bg-stone-700",
-  dotEmpty: "bg-stone-700",
+  score: "text-lime-400",
+  toggle: "bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-700",
+  dotEmpty: "bg-slate-700",
+  catWeak: "text-rose-400",
+  catMid: "text-amber-400",
+  catGood: "text-lime-400",
+  progressTrack: "bg-slate-700",
+  progressFill: "bg-lime-500",
+  mascotBubble: "bg-slate-800 border-slate-600 text-slate-200",
+  metaColor: "#020617",
   btn: {
-    primary: "bg-emerald-600 hover:bg-emerald-500 text-white",
-    ghost: "bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-600",
-    subtle: "bg-stone-700 hover:bg-stone-600 text-stone-200",
+    primary: "bg-lime-500 hover:bg-lime-400 active:translate-y-1 text-slate-950 border-b-4 border-lime-700",
+    secondary: "bg-sky-500 hover:bg-sky-400 active:translate-y-1 text-slate-950 border-b-4 border-sky-700",
+    subtle: "bg-amber-400 hover:bg-amber-300 active:translate-y-1 text-amber-950 border-b-4 border-amber-600",
+    ghost: "bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 active:translate-y-1",
   },
 };
 
@@ -272,17 +378,27 @@ function BigButton({ children, onClick, tone = "primary", disabled, t }) {
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`w-full rounded-2xl py-4 px-5 text-lg font-semibold transition-colors disabled:opacity-40 ${t.btn[tone]}`}
+      className={`w-full rounded-2xl py-4 px-5 text-lg font-bold transition disabled:opacity-40 disabled:active:translate-y-0 ${t.btn[tone]}`}
     >
       {children}
     </button>
   );
 }
 
+const BG_PATTERN = Array.from({ length: 48 }, (_, i) => (i % 3 === 0 ? "🐵" : "🍌"));
+
 function Shell({ children, t, dark, onToggle, onClose }) {
   return (
-    <div className={`min-h-screen ${t.page} flex items-center justify-center p-4 transition-colors`}>
-      <div className="w-full max-w-md">
+    <div className={`relative min-h-screen ${t.page} flex items-center justify-center p-4 transition-colors overflow-hidden`}>
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 grid grid-cols-6 gap-10 -rotate-6 scale-125 opacity-10 pointer-events-none select-none text-4xl leading-none content-center justify-items-center"
+      >
+        {BG_PATTERN.map((emoji, i) => (
+          <span key={i}>{emoji}</span>
+        ))}
+      </div>
+      <div className="relative z-10 w-full max-w-md">
         <div className="flex justify-between items-center mb-2">
           {onClose ? (
             <button
@@ -302,20 +418,57 @@ function Shell({ children, t, dark, onToggle, onClose }) {
             {dark ? "☀️ Világos mód" : "🌙 Sötét mód"}
           </button>
         </div>
-        <div className={`rounded-3xl shadow-sm border p-6 sm:p-8 transition-colors ${t.card}`}>{children}</div>
+        <div className={`rounded-3xl shadow-xl border-2 p-6 sm:p-8 transition-colors ${t.card}`}>{children}</div>
       </div>
     </div>
   );
 }
 
-function LevelDots({ level, t }) {
+function ProgressBar({ value, total, t }) {
+  const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
+  const markerPct = Math.max(6, Math.min(94, pct));
   return (
-    <div className="flex gap-1 shrink-0">
-      {[0, 1, 2, 3, 4].map((i) => (
-        <span key={i} className={`w-2.5 h-2.5 rounded-full ${i < level ? "bg-emerald-500" : t.dotEmpty}`} />
-      ))}
+    <div className={`relative w-full h-3 rounded-full overflow-visible mb-7 ${t.progressTrack}`}>
+      <div
+        className={`h-full rounded-full overflow-hidden transition-all duration-300 ${t.progressFill}`}
+        style={{ width: `${pct}%` }}
+      />
+      <div
+        className="absolute top-1/2 transition-all duration-300"
+        style={{ left: `${markerPct}%`, transform: "translate(-50%, -55%)" }}
+      >
+        <Monkey mood="happy" size={26} />
+      </div>
     </div>
   );
+}
+
+// A friendly green monkey mascot, built from real emoji so it's instantly recognizable.
+// `mood` picks which monkey emoji fits the moment (never a sad/crying face — stays encouraging).
+const MOOD_EMOJI = {
+  wave: "🐵",
+  happy: "🐵",
+  thinking: "🙊",
+  oops: "🙈",
+  celebrate: "🐒",
+  excited: "🐒",
+};
+
+function Monkey({ mood = "wave", size = 88, className = "" }) {
+  const bounce = mood === "celebrate" || mood === "excited" ? "animate-bounce" : "";
+  const emoji = MOOD_EMOJI[mood] || MOOD_EMOJI.wave;
+  return (
+    <div
+      className={`${bounce} ${className} inline-flex items-center justify-center leading-none select-none`}
+      style={{ width: size, height: size, fontSize: size * 0.85 }}
+    >
+      <span>{emoji}</span>
+    </div>
+  );
+}
+
+function SpeechBubble({ children, t }) {
+  return <div className={`rounded-2xl border-2 px-4 py-2.5 text-sm font-semibold ${t.mascotBubble}`}>{children}</div>;
 }
 
 // ---------- main component ----------
@@ -327,6 +480,9 @@ function VocabTrainer() {
   const [setupText, setSetupText] = useState("");
   const [dark, setDark] = useState(false);
   const t = dark ? DARK : LIGHT;
+  const [menuGreeting] = useState(() => pickRandom(MENU_GREETINGS));
+  const [setupMsg] = useState(() => pickRandom(SETUP_MESSAGES));
+  const [confirmReset, setConfirmReset] = useState(false);
 
   // session state
   const [sessionType, setSessionType] = useState("practice"); // practice, quick, exam
@@ -344,6 +500,7 @@ function VocabTrainer() {
   const [letterSelected, setLetterSelected] = useState(null);
   const [letterOk, setLetterOk] = useState(null);
   const [spellAllCorrect, setSpellAllCorrect] = useState(true);
+  const [reaction, setReaction] = useState(null); // { mood, text } — practice/quick only
   const [missed, setMissed] = useState([]); // {en, hu}
   const [isExam, setIsExam] = useState(false);
   const [examTotal, setExamTotal] = useState(0);
@@ -376,7 +533,7 @@ function VocabTrainer() {
   // Keep the Safari status bar / home-screen icon color in sync with light/dark mode.
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", dark ? "#0c0a09" : "#ecfdf5");
+    if (meta) meta.setAttribute("content", dark ? DARK.metaColor : LIGHT.metaColor);
   }, [dark]);
 
   function toggleDark() {
@@ -401,6 +558,7 @@ function VocabTrainer() {
     setSpellAllCorrect(true);
     setFilled({});
     setBlankPos(0);
+    setReaction(null);
 
     if (st === "recall" || st === "intro") {
       const distractors = pickDistractorWords(words, word, 3);
@@ -440,8 +598,13 @@ function VocabTrainer() {
   function handleRecallPick(opt) {
     if (recallSelected) return;
     setRecallSelected(opt);
-    if (!isExam) setRecallOk(keyOf(opt) === keyOf(currentWord));
-    else setRecallOk(null);
+    if (!isExam) {
+      const ok = keyOf(opt) === keyOf(currentWord);
+      setRecallOk(ok);
+      setReaction({ mood: ok ? "happy" : "oops", text: pickRandom(ok ? CORRECT_MESSAGES : WRONG_MESSAGES) });
+    } else {
+      setRecallOk(null);
+    }
   }
 
   function goToSpelling() {
@@ -452,6 +615,7 @@ function VocabTrainer() {
     setFilled({});
     setLetterSelected(null);
     setLetterOk(null);
+    setReaction(null);
     setLetterOptions(pickLetterOptions(currentWord.en[idxs[0]]));
     setStage("spelling");
   }
@@ -466,6 +630,7 @@ function VocabTrainer() {
       setLetterOk(ok);
       if (!ok) setSpellAllCorrect(false);
       setFilled((f) => ({ ...f, [idx]: correctChar }));
+      setReaction({ mood: ok ? "happy" : "oops", text: pickRandom(ok ? CORRECT_MESSAGES : WRONG_MESSAGES) });
     } else {
       setLetterOk(null);
       if (!ok) setSpellAllCorrect(false);
@@ -479,6 +644,7 @@ function VocabTrainer() {
       setBlankPos(nextPos);
       setLetterSelected(null);
       setLetterOk(null);
+      setReaction(null);
       setLetterOptions(pickLetterOptions(currentWord.en[blankIdx[nextPos]]));
     } else {
       finishWord();
@@ -544,11 +710,10 @@ function VocabTrainer() {
   }
 
   function handleResetProgress() {
-    const ok = window.confirm("Biztosan törlöd az eddigi haladást? A szólista megmarad, de minden szó újra kezdő szintre áll.");
-    if (!ok) return;
     const fresh = ensureProgress(words, {});
     setProgress(fresh);
     saveProgress(fresh);
+    setConfirmReset(false);
   }
 
   // ---------- render ----------
@@ -564,7 +729,13 @@ function VocabTrainer() {
   if (screen === "setup") {
     return (
       <Shell t={t} dark={dark} onToggle={toggleDark}>
-        <h1 className={`text-2xl font-serif mb-1 ${t.heading}`}>Szólista</h1>
+        <div className="flex items-center gap-3 mb-4">
+          <Monkey mood="thinking" size={56} />
+          <div>
+            <h1 className={`text-xl font-extrabold tracking-tight ${t.heading}`}>Szólista</h1>
+            <p className={`text-xs ${t.muted}`}>{setupMsg}</p>
+          </div>
+        </div>
         <p className={`text-sm mb-4 ${t.muted}`}>
           Minden sorba egy szót írj, ilyen formában: <span className="font-mono">angol – magyar</span>
         </p>
@@ -591,18 +762,30 @@ function VocabTrainer() {
     const weakWords = getWeakWords(words, progress);
     return (
       <Shell t={t} dark={dark} onToggle={toggleDark}>
-        <div className="flex justify-between items-start mb-6">
-          <h1 className={`text-2xl font-serif ${t.heading}`}>Angol szótanuló</h1>
-          <div className="flex gap-3 mt-1">
+        <div className="flex justify-end mb-1">
+          <div className="flex gap-3">
             <button onClick={openWordListEditor} className={`text-xs ${t.faint}`}>
               szólista
             </button>
-            <button onClick={() => setScreen("progressView")} className={`text-xs ${t.faint}`}>
+            <button
+              onClick={() => {
+                setConfirmReset(false);
+                setScreen("progressView");
+              }}
+              className={`text-xs ${t.faint}`}
+            >
               haladás
             </button>
           </div>
         </div>
-        <p className={`mb-6 ${t.muted}`}>{words.length} szó a listában</p>
+        <div className="flex flex-col items-center text-center mb-6">
+          <Monkey mood="wave" size={100} />
+          <h1 className={`text-2xl font-extrabold tracking-tight mt-2 ${t.heading}`}>Angol szótanuló</h1>
+          <div className="mt-3 w-full">
+            <SpeechBubble t={t}>{menuGreeting}</SpeechBubble>
+          </div>
+          <p className={`mt-3 text-sm ${t.muted}`}>{words.length} szó a listában</p>
+        </div>
         <div className="space-y-3">
           <BigButton t={t} onClick={() => beginSession("practice")}>
             Gyakorlás
@@ -610,7 +793,7 @@ function VocabTrainer() {
           <BigButton t={t} tone="subtle" disabled={weakWords.length === 0} onClick={() => beginSession("quick")}>
             {weakWords.length > 0 ? `Gyors ismétlés (${weakWords.length})` : "Gyors ismétlés"}
           </BigButton>
-          <BigButton t={t} onClick={() => beginSession("exam")} tone="ghost">
+          <BigButton t={t} onClick={() => beginSession("exam")} tone="secondary">
             Dolgozat mód
           </BigButton>
         </div>
@@ -619,61 +802,117 @@ function VocabTrainer() {
   }
 
   if (screen === "progressView") {
-    const sorted = [...words].sort(
-      (a, b) => (progress[keyOf(a)]?.level ?? 0) - (progress[keyOf(b)]?.level ?? 0)
-    );
-    const masteredCount = words.filter((w) => (progress[keyOf(w)]?.level ?? 0) >= 4).length;
+    const weakList = [];
+    const midList = [];
+    const goodList = [];
+    words.forEach((w) => {
+      const lvl = progress[keyOf(w)]?.level ?? 0;
+      if (lvl <= 1) weakList.push(w);
+      else if (lvl <= 3) midList.push(w);
+      else goodList.push(w);
+    });
+    const total = words.length || 1;
+    const sections = [
+      { key: "weak", label: "Még ismerkedünk", list: weakList, barBg: "bg-rose-400", textCls: t.catWeak },
+      { key: "mid", label: "Egyre jobban megy", list: midList, barBg: "bg-amber-400", textCls: t.catMid },
+      { key: "good", label: "Magabiztosan tudja", list: goodList, barBg: "bg-lime-500", textCls: t.catGood },
+    ];
     return (
       <Shell t={t} dark={dark} onToggle={toggleDark}>
-        <h2 className={`text-2xl font-serif mb-1 ${t.heading}`}>Haladás</h2>
-        <p className={`text-sm mb-5 ${t.muted}`}>
-          {masteredCount} / {words.length} szó megy már magabiztosan
-        </p>
-        <div className="space-y-3 max-h-96 overflow-y-auto pr-1 mb-5 ios-scroll">
-          {sorted.map((w) => {
-            const lvl = progress[keyOf(w)]?.level ?? 0;
-            return (
-              <div key={keyOf(w)} className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className={`text-sm font-medium truncate ${t.heading}`}>{w.en}</p>
-                  <p className={`text-xs truncate ${t.faint}`}>{w.hu}</p>
-                </div>
-                <LevelDots level={lvl} t={t} />
-              </div>
-            );
-          })}
+        <h2 className={`text-2xl font-extrabold tracking-tight mb-1 ${t.heading}`}>Haladás</h2>
+        <p className={`text-sm mb-4 ${t.muted}`}>Így áll {words.length} szóval:</p>
+
+        <div className="flex w-full h-3 rounded-full overflow-hidden mb-3">
+          {sections.map((s) =>
+            s.list.length > 0 ? (
+              <div key={s.key} className={s.barBg} style={{ width: `${(s.list.length / total) * 100}%` }} />
+            ) : null
+          )}
         </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-5">
+          {sections.map((s) => (
+            <div key={s.key} className="flex items-center gap-1.5 text-xs">
+              <span className={`w-2.5 h-2.5 rounded-full ${s.barBg}`} />
+              <span className={t.muted}>
+                {s.label} ({s.list.length})
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="max-h-80 overflow-y-auto pr-1 mb-5 ios-scroll">
+          {sections
+            .filter((s) => s.list.length > 0)
+            .map((s) => (
+              <div key={s.key} className="mb-4">
+                <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${s.textCls}`}>{s.label}</p>
+                <div className="space-y-2">
+                  {s.list.map((w) => (
+                    <div key={keyOf(w)} className="flex items-baseline justify-between gap-3">
+                      <span className={`text-sm font-medium truncate ${t.heading}`}>{w.en}</span>
+                      <span className={`text-xs truncate ${t.faint}`}>{w.hu}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </div>
+
         <div className="space-y-2">
           <BigButton t={t} tone="ghost" onClick={() => setScreen("menu")}>
             Vissza
           </BigButton>
-          <button
-            onClick={handleResetProgress}
-            className="w-full text-center text-xs text-rose-500 hover:text-rose-600 pt-1"
-          >
-            Haladás visszaállítása
-          </button>
+          {confirmReset ? (
+            <div className={`rounded-2xl border-2 p-3 ${t.mascotBubble}`}>
+              <p className={`text-xs mb-2 ${t.heading}`}>
+                Biztosan törlöd az eddigi haladást? A szólista megmarad, de minden szó újra kezdő szintre áll.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleResetProgress}
+                  className="flex-1 rounded-xl py-2 text-xs font-bold bg-rose-500 hover:bg-rose-400 text-white"
+                >
+                  Igen, töröld
+                </button>
+                <button
+                  onClick={() => setConfirmReset(false)}
+                  className={`flex-1 rounded-xl py-2 text-xs font-bold border-2 ${t.optionBase}`}
+                >
+                  Mégse
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmReset(true)}
+              className="w-full text-center text-xs text-rose-500 hover:text-rose-600 pt-1"
+            >
+              Haladás visszaállítása
+            </button>
+          )}
         </div>
       </Shell>
     );
   }
 
   if ((screen === "practice" || screen === "exam") && currentWord) {
-    const progressLabel = `${qIndex + 1} / ${queue.length}`;
     const modeLabel = sessionType === "exam" ? "Dolgozat mód" : sessionType === "quick" ? "Gyors ismétlés" : "Gyakorlás";
     const promptText = direction === "hu2en" ? currentWord.hu : currentWord.en;
     const promptLabel = direction === "hu2en" ? "Melyik szó jelenti ezt?" : "Mit jelent ez a szó?";
 
     return (
       <Shell t={t} dark={dark} onToggle={toggleDark} onClose={() => setScreen("menu")}>
-        <div className="flex justify-between items-center mb-6">
-          <span className={`text-xs ${t.faint}`}>{modeLabel}</span>
-          <span className={`text-xs ${t.faint}`}>{progressLabel}</span>
+        <div className="flex justify-between items-center mb-3">
+          <span className={`text-xs font-semibold ${t.faint}`}>{modeLabel}</span>
+          <span className={`text-xs ${t.faint}`}>
+            {qIndex + 1} / {queue.length}
+          </span>
         </div>
+        <ProgressBar value={qIndex} total={queue.length} t={t} />
 
         {stage === "intro" && (
-          <div className="text-center py-6">
-            <p className={`font-serif text-4xl mb-3 tracking-wide ${t.heading}`}>{currentWord.en}</p>
+          <div className="text-center py-4">
+            <p className={`font-extrabold text-4xl mb-3 tracking-tight ${t.heading}`}>{currentWord.en}</p>
             <p className={`text-xl mb-8 ${t.muted}`}>{currentWord.hu}</p>
             <BigButton t={t} onClick={handleIntroNext}>
               Tovább
@@ -684,7 +923,7 @@ function VocabTrainer() {
         {stage === "recall" && (
           <div className="py-2">
             <p className={`mb-2 text-center text-sm ${t.muted}`}>{promptLabel}</p>
-            <p className={`font-serif text-3xl mb-6 text-center ${t.heading}`}>{promptText}</p>
+            <p className={`font-extrabold text-3xl mb-6 text-center tracking-tight ${t.heading}`}>{promptText}</p>
             <div className="grid grid-cols-1 gap-3 mb-4">
               {recallOptions.map((opt) => {
                 const isSel = recallSelected && keyOf(opt) === keyOf(recallSelected);
@@ -697,13 +936,19 @@ function VocabTrainer() {
                     key={keyOf(opt)}
                     onClick={() => handleRecallPick(opt)}
                     disabled={!!recallSelected}
-                    className={`w-full rounded-2xl py-3 px-4 text-lg font-medium border transition-colors disabled:opacity-100 ${cls}`}
+                    className={`w-full rounded-2xl py-3 px-4 text-lg font-semibold border-2 transition active:scale-95 disabled:opacity-100 disabled:active:scale-100 ${cls}`}
                   >
                     {direction === "hu2en" ? opt.en : opt.hu}
                   </button>
                 );
               })}
             </div>
+            {reaction && (
+              <div className="flex items-center gap-2 mb-4">
+                <Monkey mood={reaction.mood} size={40} />
+                <SpeechBubble t={t}>{reaction.text}</SpeechBubble>
+              </div>
+            )}
             {recallSelected && (
               <BigButton t={t} onClick={goToSpelling}>
                 Következő
@@ -752,13 +997,19 @@ function VocabTrainer() {
                     key={l}
                     onClick={() => handleLetterPick(l)}
                     disabled={!!letterSelected}
-                    className={`rounded-xl py-3 text-xl font-semibold border disabled:opacity-100 ${cls}`}
+                    className={`rounded-xl py-3 text-xl font-bold border-2 transition active:scale-95 disabled:opacity-100 disabled:active:scale-100 ${cls}`}
                   >
                     {l}
                   </button>
                 );
               })}
             </div>
+            {reaction && (
+              <div className="flex items-center gap-2 mb-4">
+                <Monkey mood={reaction.mood} size={40} />
+                <SpeechBubble t={t}>{reaction.text}</SpeechBubble>
+              </div>
+            )}
             {letterSelected && (
               <BigButton t={t} onClick={nextBlankOrFinish}>
                 Következő
@@ -771,15 +1022,18 @@ function VocabTrainer() {
   }
 
   if (screen === "practiceEnd") {
+    const perfect = missed.length === 0;
+    const title = sessionType === "quick" ? "Kész a gyors ismétléssel!" : "Kész a gyakorlás!";
+    const msg = perfect ? pickRandom(PRACTICE_PERFECT_MESSAGES) : pickRandom(PRACTICE_GOOD_MESSAGES);
     return (
       <Shell t={t} dark={dark} onToggle={toggleDark}>
-        <h2 className={`text-2xl font-serif mb-3 ${t.heading}`}>
-          {sessionType === "quick" ? "Kész a gyors ismétléssel!" : "Kész a gyakorlás!"}
-        </h2>
-        <p className={`mb-6 ${t.muted}`}>{queue.length} szót néztetek át.</p>
+        <div className="flex flex-col items-center text-center mb-5">
+          <Monkey mood={perfect ? "celebrate" : "happy"} size={96} />
+          <h2 className={`text-2xl font-extrabold tracking-tight mt-2 ${t.heading}`}>{title}</h2>
+          <p className={`mt-2 text-sm ${t.muted}`}>{msg}</p>
+        </div>
         {missed.length > 0 && (
           <div className="mb-6">
-            <p className={`text-sm mb-2 ${t.muted}`}>Ezekre még érdemes figyelni:</p>
             <ul className={`space-y-1 ${t.heading}`}>
               {missed.map((w) => (
                 <li key={keyOf(w)} className="text-sm">
@@ -797,13 +1051,25 @@ function VocabTrainer() {
   }
 
   if (screen === "examEnd") {
+    const ratio = examTotal > 0 ? examCorrect / examTotal : 0;
+    const mood = ratio === 1 ? "celebrate" : ratio >= 0.7 ? "happy" : "oops";
+    const msg =
+      ratio === 1
+        ? pickRandom(EXAM_PERFECT_MESSAGES)
+        : ratio >= 0.7
+        ? pickRandom(EXAM_GOOD_MESSAGES)
+        : pickRandom(EXAM_PRACTICE_MESSAGES);
     return (
       <Shell t={t} dark={dark} onToggle={toggleDark}>
-        <h2 className={`text-2xl font-serif mb-3 ${t.heading}`}>Dolgozat eredménye</h2>
-        <p className={`text-4xl font-serif mb-6 ${t.score}`}>
+        <div className="flex flex-col items-center text-center mb-3">
+          <Monkey mood={mood} size={96} />
+          <h2 className={`text-2xl font-extrabold tracking-tight mt-2 ${t.heading}`}>Dolgozat eredménye</h2>
+        </div>
+        <p className={`text-4xl font-extrabold text-center mb-3 ${t.score}`}>
           {examCorrect} / {examTotal}
         </p>
-        {missed.length > 0 ? (
+        <p className={`text-center text-sm mb-6 ${t.muted}`}>{msg}</p>
+        {missed.length > 0 && (
           <div className="mb-6">
             <p className={`text-sm mb-2 ${t.muted}`}>Bizonytalan szavak:</p>
             <ul className={`space-y-1 ${t.heading}`}>
@@ -815,8 +1081,6 @@ function VocabTrainer() {
             </ul>
             <p className={`text-xs mt-3 ${t.faint}`}>Ezek automatikusan visszakerülnek a következő gyakorlásba.</p>
           </div>
-        ) : (
-          <p className={`mb-6 ${t.muted}`}>Minden szót tudtál! 🎉</p>
         )}
         <BigButton t={t} onClick={() => setScreen("menu")}>
           Vissza
