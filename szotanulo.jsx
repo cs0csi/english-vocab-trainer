@@ -1,61 +1,36 @@
-<!doctype html>
-<html lang="hu">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Szótanuló" />
-<meta name="theme-color" content="#0ea5e9" />
-<link rel="manifest" href="manifest.json" />
-<link rel="apple-touch-icon" href="apple-touch-icon.png" />
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
-<link rel="icon" href="favicon.ico" />
-<title>Angol szótanuló</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="words.js"></script>
-<style>
-  html, body {
-    height: 100%;
-    margin: 0;
-    -webkit-text-size-adjust: 100%;
-  }
-  body {
-    -webkit-tap-highlight-color: transparent;
-    overscroll-behavior-y: none;
-    background: #f0f9ff;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    box-sizing: border-box;
-  }
-  button {
-    touch-action: manipulation;
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-  }
-  /* Use the visible (address-bar aware) viewport height on iOS Safari instead of 100vh,
-     so the layout doesn't jump when the toolbar shows/hides. */
-  .min-h-screen {
-    min-height: 100svh !important;
-  }
-  .ios-scroll {
-    -webkit-overflow-scrolling: touch;
-  }
-</style>
-</head>
-<body>
-<div id="root"></div>
+import React, { useState, useEffect } from "react";
 
-<script type="text/babel">
-const { useState, useEffect } = React;
+// ---------- DEFAULT_WORDS_START ----------
+// Alap szókészlet, ha még nincs mentett szólista.
+// Formátum soronként: "angol szó – magyar jelentés"
+// (A GitHub Pages verzióban ez egy külön words.js fájlban van.)
+const DEFAULT_WORDS_TEXT = `nightgown – pizsama
+suitcase – bőrönd
+in case – arra az esetre
+warm enough – elég meleg
+stormy – viharos
+cloudy – felhős
+appeared – megjelent
+lightning – villám
+barn – pajta
+hay – szalma
+hardly – alig
+school supplies – iskolai szerek
+sack – zsák
+principal – igazgató
+water leak – csőtörés
+flood – eláraszt
+shaped like – olyan alakú
+float – lebeg
+bounce – pattogni
+drops – csepp
+fog – köd
+college - egyetem, főiskola
+governor - kormányzó
+president - elnök
+twin - iker
+ranch - birtok, tanya`;
+// ---------- DEFAULT_WORDS_END ----------
 
 // ---------- mascot copy ----------
 
@@ -339,35 +314,35 @@ async function loadData() {
   let progress = {};
   let theme = "light";
   try {
-    const w = localStorage.getItem("wordlist");
-    if (w) words = JSON.parse(w);
+    const r = await window.storage.get("wordlist", false);
+    if (r) words = JSON.parse(r.value);
   } catch (e) {}
   try {
-    const p = localStorage.getItem("progress");
-    if (p) progress = JSON.parse(p);
+    const r = await window.storage.get("progress", false);
+    if (r) progress = JSON.parse(r.value);
   } catch (e) {}
   try {
-    const th = localStorage.getItem("theme");
-    if (th) theme = th;
+    const r = await window.storage.get("theme", false);
+    if (r) theme = r.value;
   } catch (e) {}
   return { words, progress, theme };
 }
 
 async function saveWords(words) {
   try {
-    localStorage.setItem("wordlist", JSON.stringify(words));
+    await window.storage.set("wordlist", JSON.stringify(words), false);
   } catch (e) {}
 }
 
 async function saveProgress(progress) {
   try {
-    localStorage.setItem("progress", JSON.stringify(progress));
+    await window.storage.set("progress", JSON.stringify(progress), false);
   } catch (e) {}
 }
 
 async function saveTheme(theme) {
   try {
-    localStorage.setItem("theme", theme);
+    await window.storage.set("theme", theme, false);
   } catch (e) {}
 }
 
@@ -487,7 +462,7 @@ function BananaScore({ ratio }) {
 
 // ---------- main component ----------
 
-function VocabTrainer() {
+export default function VocabTrainer() {
   const [screen, setScreen] = useState("loading"); // loading, setup, menu, practice, practiceEnd, exam, examEnd, progressView
   const [words, setWords] = useState([]);
   const [progress, setProgress] = useState({});
@@ -531,7 +506,7 @@ function VocabTrainer() {
         setProgress(ensureProgress(w, p));
         setScreen("menu");
       } else {
-        const defaults = parseWordList(window.DEFAULT_WORDS_TEXT || "");
+        const defaults = parseWordList(DEFAULT_WORDS_TEXT);
         if (defaults.length > 0) {
           const dp = ensureProgress(defaults, {});
           setWords(defaults);
@@ -1158,8 +1133,3 @@ function VocabTrainer() {
 
   return null;
 }
-
-ReactDOM.createRoot(document.getElementById("root")).render(<VocabTrainer />);
-</script>
-</body>
-</html>
