@@ -4,32 +4,96 @@ import React, { useState, useEffect } from "react";
 // Alap szókészlet, ha még nincs mentett szólista.
 // Formátum soronként: "angol szó – magyar jelentés"
 // (A GitHub Pages verzióban ez egy külön words.js fájlban van.)
-const DEFAULT_WORDS_TEXT = `nightgown – pizsama
-suitcase – bőrönd
-in case – arra az esetre
-warm enough – elég meleg
-stormy – viharos
-cloudy – felhős
-appeared – megjelent
-lightning – villám
-barn – pajta
-hay – szalma
-hardly – alig
-school supplies – iskolai szerek
-sack – zsák
-principal – igazgató
-water leak – csőtörés
-flood – eláraszt
-shaped like – olyan alakú
-float – lebeg
-bounce – pattogni
-drops – csepp
-fog – köd
-college - egyetem, főiskola
-governor - kormányzó
-president - elnök
-twin - iker
-ranch - birtok, tanya`;
+const DEFAULT_WORDS_TEXT = `goodbye – viszlát
+bye – szia, viszlát
+good morning – jó reggelt
+good afternoon – jó napot
+good evening – jó estét
+good night – jó éjszakát
+eight – nyolc
+nine – kilenc
+eleven – tizenegy
+twelve – tizenkettő
+thirteen – tizenhárom
+fourteen – tizennégy
+fifteen – tizenöt
+sixteen – tizenhat
+seventeen – tizenhét
+eighteen – tizennyolc
+nineteen – tizenkilenc
+twenty – húsz
+thirty – harminc
+forty – negyven
+fifty – ötven
+sixty – hatvan
+seventy – hetven
+eighty – nyolcvan
+ninety – kilencven
+one hundred – száz
+Monday – hétfő
+Tuesday – kedd
+Wednesday – szerda
+Thursday – csütörtök
+Friday – péntek
+Saturday – szombat
+Sunday – vasárnap
+book – könyv
+notebook – füzet
+pen – toll
+pencil – ceruza
+pencil case – tolltartó
+ruler – vonalzó
+rubber – radír
+schoolbag – iskolatáska
+desk – pad, íróasztal
+chair – szék
+board – tábla
+computer – számítógép
+bag – táska
+mobile phone – mobiltelefon
+watch – óra
+keys – kulcsok
+glasses – szemüveg
+Hungary – Magyarország
+Hungarian – magyar
+England – Anglia
+English – angol
+Germany – Németország
+German – német
+France – Franciaország
+French – francia
+Italy – Olaszország
+Italian – olasz
+Spain – Spanyolország
+Spanish – spanyol
+America – Amerika
+American – amerikai
+mother – anya
+father – apa
+mum – anya
+dad – apa
+brother – fiútestvér
+sister – lánytestvér
+grandmother – nagymama
+grandfather – nagypapa
+aunt – nagynéni
+uncle – nagybácsi
+cousin – unokatestvér
+yellow – sárga
+orange – narancssárga
+purple – lila
+brown – barna
+white – fehér
+grey – szürke
+listen – hallgass
+repeat – ismételd
+look – nézz
+read – olvass
+write – írj
+open – nyisd ki
+close – csukd be
+stand up – állj fel
+sit down – ülj le`;
 // ---------- DEFAULT_WORDS_END ----------
 
 // ---------- mascot copy ----------
@@ -222,7 +286,7 @@ function pickBlankIndices(word, level) {
   return shuffle(pool).slice(0, count).sort((a, b) => a - b);
 }
 
-function buildPracticeQueue(pool, progress) {
+function buildPracticeQueue(pool, progress, maxQuestions = DEFAULT_MAX_QUESTIONS) {
   if (!pool || pool.length === 0) return [];
   let items = [];
   pool.forEach((w) => {
@@ -237,7 +301,8 @@ function buildPracticeQueue(pool, progress) {
       [items[i], items[j]] = [items[j], items[i]];
     }
   }
-  const size = Math.max(8, Math.min(20, Math.round(pool.length * 1.6)));
+  const cap = Math.max(1, maxQuestions || DEFAULT_MAX_QUESTIONS);
+  const size = Math.max(Math.min(8, cap), Math.min(cap, Math.round(pool.length * 1.6)));
   return items.slice(0, Math.min(size, items.length));
 }
 
@@ -309,10 +374,13 @@ const DARK = {
 
 // ---------- storage ----------
 
+const DEFAULT_MAX_QUESTIONS = 25;
+
 async function loadData() {
   let words = null;
   let progress = {};
   let theme = "light";
+  let maxQuestions = DEFAULT_MAX_QUESTIONS;
   try {
     const r = await window.storage.get("wordlist", false);
     if (r) words = JSON.parse(r.value);
@@ -325,7 +393,14 @@ async function loadData() {
     const r = await window.storage.get("theme", false);
     if (r) theme = r.value;
   } catch (e) {}
-  return { words, progress, theme };
+  try {
+    const r = await window.storage.get("maxQuestions", false);
+    if (r) {
+      const n = parseInt(r.value, 10);
+      if (!isNaN(n) && n > 0) maxQuestions = n;
+    }
+  } catch (e) {}
+  return { words, progress, theme, maxQuestions };
 }
 
 async function saveWords(words) {
@@ -343,6 +418,12 @@ async function saveProgress(progress) {
 async function saveTheme(theme) {
   try {
     await window.storage.set("theme", theme, false);
+  } catch (e) {}
+}
+
+async function saveMaxQuestions(n) {
+  try {
+    await window.storage.set("maxQuestions", String(n), false);
   } catch (e) {}
 }
 
@@ -473,6 +554,8 @@ export default function VocabTrainer() {
   const [setupMsg] = useState(() => pickRandom(SETUP_MESSAGES));
   const [confirmReset, setConfirmReset] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [maxQuestions, setMaxQuestions] = useState(DEFAULT_MAX_QUESTIONS);
+  const [maxQuestionsInput, setMaxQuestionsInput] = useState(String(DEFAULT_MAX_QUESTIONS));
 
   // session state
   const [sessionType, setSessionType] = useState("practice"); // practice, quick, exam
@@ -499,8 +582,10 @@ export default function VocabTrainer() {
 
   useEffect(() => {
     (async () => {
-      const { words: w, progress: p, theme } = await loadData();
+      const { words: w, progress: p, theme, maxQuestions: mq } = await loadData();
       setDark(theme === "dark");
+      setMaxQuestions(mq);
+      setMaxQuestionsInput(String(mq));
       if (w && w.length > 0) {
         setWords(w);
         setProgress(ensureProgress(w, p));
@@ -526,6 +611,14 @@ export default function VocabTrainer() {
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", dark ? DARK.metaColor : LIGHT.metaColor);
   }, [dark]);
+
+  function commitMaxQuestions(raw) {
+    const n = parseInt(raw, 10);
+    const clamped = !isNaN(n) ? Math.max(5, Math.min(200, n)) : DEFAULT_MAX_QUESTIONS;
+    setMaxQuestions(clamped);
+    setMaxQuestionsInput(String(clamped));
+    saveMaxQuestions(clamped);
+  }
 
   function toggleDark() {
     setDark((prev) => {
@@ -583,7 +676,9 @@ export default function VocabTrainer() {
     setExamTotal(0);
     setExamCorrect(0);
     const pool = type === "quick" ? getWeakWords(words, progress) : words;
-    const q = exam ? shuffle(pool) : buildPracticeQueue(pool, progress);
+    const q = exam
+      ? shuffle(pool).slice(0, Math.max(1, maxQuestions))
+      : buildPracticeQueue(pool, progress, maxQuestions);
     if (q.length === 0) return;
     setQueue(q);
     setQIndex(0);
@@ -886,6 +981,26 @@ export default function VocabTrainer() {
             ))}
         </div>
 
+        <div className={`rounded-2xl border-2 p-3 mb-5 ${t.mascotBubble}`}>
+          <label htmlFor="maxq" className={`block text-xs font-bold mb-1 ${t.heading}`}>
+            Feladatok száma (Majomiskola / Banánpróba)
+          </label>
+          <p className={`text-xs mb-2 ${t.muted}`}>
+            Ennyi szó jön max. egy Majomiskola vagy Banánpróba körben (alapból 25).
+          </p>
+          <input
+            id="maxq"
+            type="number"
+            inputMode="numeric"
+            min={5}
+            max={200}
+            value={maxQuestionsInput}
+            onChange={(e) => setMaxQuestionsInput(e.target.value)}
+            onBlur={(e) => commitMaxQuestions(e.target.value)}
+            className={`w-24 rounded-xl border-2 px-3 py-2 text-sm font-semibold ${t.textarea}`}
+          />
+        </div>
+
         <div className="space-y-2">
           <BigButton t={t} tone="ghost" onClick={() => setScreen("menu")}>
             Vissza a fára
@@ -982,7 +1097,7 @@ export default function VocabTrainer() {
             )}
             {recallSelected && (
               <BigButton t={t} onClick={isExam ? finishWord : goToSpelling}>
-                Liánra!
+                Tovább
               </BigButton>
             )}
           </div>
@@ -1046,7 +1161,7 @@ export default function VocabTrainer() {
             )}
             {letterSelected && (
               <BigButton t={t} onClick={nextBlankOrFinish}>
-                Liánra!
+                Tovább
               </BigButton>
             )}
           </div>
