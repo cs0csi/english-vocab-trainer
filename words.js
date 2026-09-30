@@ -4,7 +4,72 @@
 // (Ez csak az ALAP készlet: ha az appban a "szólista" menüpontban már elmentettél egy sajátot,
 // ez a fájl utána nem lesz többé figyelembe véve, amíg a böngésző adatait nem törlöd.)
 
-window.DEFAULT_WORDS_TEXT = `goodbye – viszlát
+window.DEFAULT_WORDS_TEXT = `head – fej
+hair – haj
+eye – szem
+ear – fül
+nose – orr
+mouth – száj
+neck – nyak
+shoulder – váll
+arm – kar
+elbow – könyök
+hand – kéz
+finger – ujj
+leg – láb
+knee – térd
+foot – lábfej
+toe – lábujj
+cheek – arc
+chin – áll
+lip – ajak
+tooth – fog
+cat – macska
+kitten – kiscica
+mouse – egér
+puppy – kiskutya
+dog – kutya
+fish – hal
+bird – madár
+tall – magas
+short – alacsony
+slim – vékony
+fat – kövér
+thin – sovány
+big – nagy
+small – kicsi
+long – hosszú
+beautiful – gyönyörű
+ugly – csúnya
+young – fiatal
+old – öreg, idős
+twins – ikrek
+dimpled – gödröcskés
+freckled – szeplős
+moustache – bajusz
+beard – szakáll
+curly – göndör
+straight – egyenes
+wavy – hullámos
+glasses – szemüveg
+mess – rendetlenség
+clean – tiszta
+messy – rendetlen
+tidy – rendezett
+hospital – kórház
+patient – beteg, páciens
+medicine – gyógyszer
+fever – láz
+broke leg – eltörte a lábát
+care – gondozás, törődés
+allergy – allergia
+injured – sérült
+funny – vicces
+appear – megjelenik
+crossed – keresztezett`;
+
+
+/*goodbye – viszlát
 bye – szia, viszlát
 good morning – jó reggelt
 good afternoon – jó napot
@@ -93,4 +158,5 @@ write – írj
 open – nyisd ki
 close – csukd be
 stand up – állj fel
-sit down – ülj le`;
+sit down – ülj le
+*/
