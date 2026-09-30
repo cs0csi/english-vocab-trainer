@@ -4,69 +4,89 @@
 // (Ez csak az ALAP készlet: ha az appban a "szólista" menüpontban már elmentettél egy sajátot,
 // ez a fájl utána nem lesz többé figyelembe véve, amíg a böngésző adatait nem törlöd.)
 
-window.DEFAULT_WORDS_TEXT = `head – fej
-hair – haj
-eye – szem
-ear – fül
-nose – orr
-mouth – száj
-neck – nyak
-shoulder – váll
-arm – kar
-elbow – könyök
-hand – kéz
-finger – ujj
-leg – láb
-knee – térd
-foot – lábfej
-toe – lábujj
-cheek – arc
-chin – áll
-lip – ajak
-tooth – fog
-cat – macska
-kitten – kiscica
-mouse – egér
-puppy – kiskutya
-dog – kutya
-fish – hal
-bird – madár
-tall – magas
-short – alacsony
-slim – vékony
-fat – kövér
-thin – sovány
-big – nagy
-small – kicsi
-long – hosszú
-beautiful – gyönyörű
-ugly – csúnya
-young – fiatal
-old – öreg, idős
-twins – ikrek
-dimpled – gödröcskés
-freckled – szeplős
-moustache – bajusz
-beard – szakáll
-curly – göndör
-straight – egyenes
-wavy – hullámos
-glasses – szemüveg
-mess – rendetlenség
-clean – tiszta
-messy – rendetlen
-tidy – rendezett
-hospital – kórház
-patient – beteg, páciens
-medicine – gyógyszer
-fever – láz
-broke leg – eltörte a lábát
-care – gondozás, törődés
-allergy – allergia
-injured – sérült
-funny – vicces
-appear – megjelenik
-crossed – keresztezett`;
+window.DEFAULT_WORDS_TEXT = `smartphone - okostelefon
+laptop - laptop / hordozható számítógép
+tablet - táblagép
+sunglasses - napszemüveg
+headphones - fejhallgató
+skateboard - gördeszka
+e-scooter - elektromos roller
+rollerblades - görkorcsolya
+smartwatch - okosóra
+game console - játékkonzol
+pencil case - tolltartó
+bag - táska
+youth club - ifjúsági klub
+gadget - kütyü
+item of clothing - ruhadarab
+pet - háziállat
+best friend - legjobb barát
+possessions - tulajdontárgyak
+clothes - ruhák / ruházat
+talents - tehetség
+abilities - képességek
+appearance - megjelenés / külső
+shoulder - váll
+wrist - csukló
+elbow - könyök
+fingers - ujjak
+lips - ajkak
+cheek - orca / arc
+neck - nyak
+right hand - jobb kéz
+knee - térd
+ankle - boka
+toes - lábujjak
+chin - áll
+thumb - hüvelykujj
+hips - csípő
+fluffy tail - bolyhos farok
+small ears - kis fülek
+short striped fur - rövid csíkos bunda
+leaf - falevél
+leaves - falevelek
+man - férfi
+men - férfiak
+child - gyerek
+children - gyerekek
+fish - hal
+fish - halak
+woman - nő
+women - nők
+person - személy
+people - emberek
+foot - lábfej
+feet - lábfejek
+smartwatch - okosóra
+smartwatches - okosórák
+body - test
+bodies - testek
+trick - trükk
+turned flips - szaltó
+juggled - zsonglőrködni
+squeezed - beprésel
+brightly - élénken
+yarn - fonal
+all of a sudden - hirtelen
+soaped - szappanoz
+eagle - sas
+backyard - udvar
+mess - rendetlenség
+blocks - kockák
+crayons - zsírkréta
+marbles - üveggolyó
+jar - befőttesüveg
+playing hospital - kórházasdit játszani
+patient - páciens
+pretended - úgy tett
+fever - láz
+bunk bed - emeletes ágy
+cave - barlang
+shaggy - rongyos
+striped - csíkos
+hoops - karikák
+arrow - nyílvessző
+crooked - ferde`;
 
 
 /*goodbye – viszlát
