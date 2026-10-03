@@ -4,79 +4,22 @@
 // (Ez csak az ALAP készlet: ha az appban a "szólista" menüpontban már elmentettél egy sajátot,
 // ez a fájl utána nem lesz többé figyelembe véve, amíg a böngésző adatait nem törlöd.)
 
-window.DEFAULT_WORDS_TEXT = `smartphone - okostelefon
-laptop - laptop / hordozható számítógép
-tablet - táblagép
-sunglasses - napszemüveg
-headphones - fejhallgató
-skateboard - gördeszka
-e-scooter - elektromos roller
-rollerblades - görkorcsolya
-smartwatch - okosóra
-game console - játékkonzol
-pencil case - tolltartó
-bag - táska
-youth club - ifjúsági klub
-gadget - kütyü
-item of clothing - ruhadarab
-pet - háziállat
-best friend - legjobb barát
-possessions - tulajdontárgyak
-clothes - ruhák / ruházat
-talents - tehetség
-abilities - képességek
-appearance - megjelenés / külső
-shoulder - váll
-wrist - csukló
-elbow - könyök
-fingers - ujjak
-lips - ajkak
-cheek - orca / arc
-neck - nyak
-right hand - jobb kéz
-knee - térd
-ankle - boka
-toes - lábujjak
-chin - áll
-thumb - hüvelykujj
-hips - csípő
-fluffy tail - bolyhos farok
-small ears - kis fülek
-short striped fur - rövid csíkos bunda
-leaf - falevél
-leaves - falevelek
-man - férfi
-men - férfiak
-child - gyerek
-children - gyerekek
-fish - hal
-fish - halak
-woman - nő
-women - nők
-person - személy
-people - emberek
-foot - lábfej
-feet - lábfejek
-smartwatch - okosóra
-smartwatches - okosórák
-body - test
-bodies - testek
-trick - trükk
+window.DEFAULT_WORDS_TEXT = `tricks - trükk
 turned flips - szaltó
 juggled - zsonglőrködni
-squeezed - beprésel
+squeezed - bepréselődni
 brightly - élénken
-yarn - fonal
+yarn - fonál
 all of a sudden - hirtelen
-soaped - szappanoz
+soared - szárnyalt
 eagle - sas
 backyard - udvar
 mess - rendetlenség
-blocks - kockák
 crayons - zsírkréta
 marbles - üveggolyó
 jar - befőttesüveg
-playing hospital - kórházasdit játszani
+blocks - építőkockák
+playing hospital - kórházasat játszani
 patient - páciens
 pretended - úgy tett
 fever - láz
@@ -84,8 +27,8 @@ bunk bed - emeletes ágy
 cave - barlang
 shaggy - rongyos
 striped - csíkos
-hoops - karikák
-arrow - nyílvessző
+horns - szarvak
+arrows - nyílvessző
 crooked - ferde`;
 
 
