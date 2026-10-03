@@ -1,99 +1,76 @@
 import React, { useState, useEffect } from "react";
 
+// =====================================================================
+// LUCKY WHEEL SETTINGS  (edit this block only)
+// =====================================================================
+// After a session ends with every word correct on the first try and at
+// least `minWords` words asked, the child may spin the wheel once.
+//
+// enabled      : false turns the whole feature off.
+// modes        : which session types can award a spin:
+//                "exam" (Banánpróba), "practice" (Majomiskola),
+//                "quick" (Banánfrissítő).
+// minWords     : minimum number of words in the session.
+// spinSeconds  : length of the spin animation.
+// extraTurns   : full extra rotations before the wheel stops (visual only).
+// prizes       : label = text shown on the wheel and in the result,
+//                weight = relative chance. The chance of a prize is
+//                weight / (sum of all weights). Example: weights
+//                30, 20, 10 -> 50%, 33.3%, 16.7%. Weight 0 hides a prize.
+//                none: true marks a "no prize" slice (for example "no banana
+//                this time"). It can be spun like any other slice, but it is
+//                not saved to the prize log in the parent view.
+//                Every prize gets an equal-sized slice on the wheel, no
+//                matter its weight. Labels longer than 14 characters are
+//                shortened on the wheel (the result shows the full text).
+//                Use at least 2 prizes with a weight above 0.
+const WHEEL_CONFIG = {
+  enabled: true,
+  modes: ["exam"],
+  minWords: 25,
+  spinSeconds: 5,
+  extraTurns: 5,
+  prizes: [
+    { label: "Extra 15 perc játék", weight: 24 },
+    { label: "Fagyi", weight: 20 },
+    { label: "Te választod a vacsorát", weight: 16 },
+    { label: "Közös társasjáték", weight: 12 },
+    { label: "Mozi", weight: 6 },
+    { label: "Szuper jackpot", weight: 2 },
+    { label: "Most nincs banán", weight: 20, none: true },
+  ],
+};
+
 // ---------- DEFAULT_WORDS_START ----------
 // Alap szókészlet, ha még nincs mentett szólista.
 // Formátum soronként: "angol szó – magyar jelentés"
 // (A GitHub Pages verzióban ez egy külön words.js fájlban van.)
-const DEFAULT_WORDS_TEXT = `goodbye – viszlát
-bye – szia, viszlát
-good morning – jó reggelt
-good afternoon – jó napot
-good evening – jó estét
-good night – jó éjszakát
-eight – nyolc
-nine – kilenc
-eleven – tizenegy
-twelve – tizenkettő
-thirteen – tizenhárom
-fourteen – tizennégy
-fifteen – tizenöt
-sixteen – tizenhat
-seventeen – tizenhét
-eighteen – tizennyolc
-nineteen – tizenkilenc
-twenty – húsz
-thirty – harminc
-forty – negyven
-fifty – ötven
-sixty – hatvan
-seventy – hetven
-eighty – nyolcvan
-ninety – kilencven
-one hundred – száz
-Monday – hétfő
-Tuesday – kedd
-Wednesday – szerda
-Thursday – csütörtök
-Friday – péntek
-Saturday – szombat
-Sunday – vasárnap
-book – könyv
-notebook – füzet
-pen – toll
-pencil – ceruza
-pencil case – tolltartó
-ruler – vonalzó
-rubber – radír
-schoolbag – iskolatáska
-desk – pad, íróasztal
-chair – szék
-board – tábla
-computer – számítógép
-bag – táska
-mobile phone – mobiltelefon
-watch – óra
-keys – kulcsok
-glasses – szemüveg
-Hungary – Magyarország
-Hungarian – magyar
-England – Anglia
-English – angol
-Germany – Németország
-German – német
-France – Franciaország
-French – francia
-Italy – Olaszország
-Italian – olasz
-Spain – Spanyolország
-Spanish – spanyol
-America – Amerika
-American – amerikai
-mother – anya
-father – apa
-mum – anya
-dad – apa
-brother – fiútestvér
-sister – lánytestvér
-grandmother – nagymama
-grandfather – nagypapa
-aunt – nagynéni
-uncle – nagybácsi
-cousin – unokatestvér
-yellow – sárga
-orange – narancssárga
-purple – lila
-brown – barna
-white – fehér
-grey – szürke
-listen – hallgass
-repeat – ismételd
-look – nézz
-read – olvass
-write – írj
-open – nyisd ki
-close – csukd be
-stand up – állj fel
-sit down – ülj le`;
+const DEFAULT_WORDS_TEXT = `tricks - trükk
+turned flips - szaltó
+juggled - zsonglőrködni
+squeezed - bepréselődni
+brightly - élénken
+yarn - fonál
+all of a sudden - hirtelen
+soared - szárnyalt
+eagle - sas
+backyard - udvar
+mess - rendetlenség
+crayons - zsírkréta
+marbles - üveggolyó
+jar - befőttesüveg
+blocks - építőkockák
+playing hospital - kórházasat játszani
+patient - páciens
+pretended - úgy tett
+fever - láz
+bunk bed - emeletes ágy
+cave - barlang
+shaggy - rongyos
+striped - csíkos
+horns - szarvak
+arrows - nyílvessző
+crooked - ferde`;
 // ---------- DEFAULT_WORDS_END ----------
 
 // ---------- mascot copy ----------
@@ -400,7 +377,15 @@ async function loadData() {
       if (!isNaN(n) && n > 0) maxQuestions = n;
     }
   } catch (e) {}
-  return { words, progress, theme, maxQuestions };
+  let prizes = [];
+  try {
+    const r = await window.storage.get("prizeLog", false);
+    if (r) {
+      const arr = JSON.parse(r.value);
+      if (Array.isArray(arr)) prizes = arr;
+    }
+  } catch (e) {}
+  return { words, progress, theme, maxQuestions, prizes };
 }
 
 async function saveWords(words) {
@@ -418,6 +403,12 @@ async function saveProgress(progress) {
 async function saveTheme(theme) {
   try {
     await window.storage.set("theme", theme, false);
+  } catch (e) {}
+}
+
+async function saveWheelPrizes(list) {
+  try {
+    await window.storage.set("prizeLog", JSON.stringify(list), false);
   } catch (e) {}
 }
 
@@ -541,6 +532,161 @@ function BananaScore({ ratio }) {
   );
 }
 
+// ---------- lucky wheel ----------
+
+const WHEEL_COLORS = ["#d97706", "#16a34a", "#0284c7", "#db2777", "#7c3aed", "#ea580c"];
+
+function wheelPoint(cx, cy, r, angleDeg) {
+  // Angle is measured clockwise from the top (12 o'clock).
+  const rad = (angleDeg * Math.PI) / 180;
+  return [cx + r * Math.sin(rad), cy - r * Math.cos(rad)];
+}
+
+function formatPrizeDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString("hu-HU", { year: "numeric", month: "short", day: "numeric" });
+  } catch (e) {
+    return "";
+  }
+}
+
+function isWheelEligible(sessionType, wordCount, missedCount) {
+  if (!WHEEL_CONFIG.enabled) return false;
+  if (!WHEEL_CONFIG.modes.includes(sessionType)) return false;
+  return missedCount === 0 && wordCount >= WHEEL_CONFIG.minWords;
+}
+
+function WheelOfFortune({ t, onWin }) {
+  const prizes = (WHEEL_CONFIG.prizes || []).filter((p) => p && p.label && p.weight > 0);
+  const [phase, setPhase] = useState("ready"); // ready, spinning, done
+  const [rotation, setRotation] = useState(0);
+  const [winner, setWinner] = useState(null);
+
+  useEffect(() => {
+    if (phase !== "spinning") return undefined;
+    const id = setTimeout(() => setPhase("done"), WHEEL_CONFIG.spinSeconds * 1000 + 300);
+    return () => clearTimeout(id);
+  }, [phase]);
+
+  if (prizes.length < 2) return null;
+
+  const n = prizes.length;
+  const sliceAngle = 360 / n;
+  const size = 300;
+  const c = size / 2;
+  const r = 140;
+
+  function spin() {
+    if (phase !== "ready") return;
+    // Pick the winner first (weighted), then rotate the wheel so that slice stops under the pointer.
+    const totalWeight = prizes.reduce((sum, p) => sum + p.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let idx = n - 1;
+    for (let i = 0; i < n; i++) {
+      roll -= prizes[i].weight;
+      if (roll < 0) {
+        idx = i;
+        break;
+      }
+    }
+    const jitter = (Math.random() - 0.5) * sliceAngle * 0.7;
+    const target = 360 * WHEEL_CONFIG.extraTurns + (360 - (idx + 0.5) * sliceAngle) + jitter;
+    setWinner(prizes[idx]);
+    if (onWin && !prizes[idx].none) onWin(prizes[idx]);
+    setRotation(target);
+    setPhase("spinning");
+  }
+
+  const fontSize = n > 8 ? 11 : 13;
+
+  return (
+    <div className="flex flex-col items-center mb-6">
+      <p className={`text-lg font-extrabold mb-1 ${t.heading}`}>Szerencsekerék</p>
+      <p className={`text-sm mb-3 text-center ${t.muted}`}>
+        {phase === "ready" && "Hibátlan lett, pörgethetsz egyet!"}
+        {phase === "spinning" && "Pörög..."}
+        {phase === "done" && (winner && winner.none ? "Ezúttal ez jött ki:" : "Ezt nyerted:")}
+      </p>
+      <div className="relative" style={{ width: size, maxWidth: "100%" }}>
+        <svg
+          width="34"
+          height="34"
+          viewBox="0 0 34 34"
+          style={{ position: "absolute", left: "50%", top: -10, marginLeft: -17, zIndex: 2 }}
+        >
+          <polygon points="17,32 3,4 31,4" fill="#ef4444" stroke="#7f1d1d" strokeWidth="2" strokeLinejoin="round" />
+        </svg>
+        <div
+          style={{
+            transform: `rotate(${rotation}deg)`,
+            transition:
+              phase === "spinning"
+                ? `transform ${WHEEL_CONFIG.spinSeconds}s cubic-bezier(0.17, 0.67, 0.12, 0.99)`
+                : "none",
+            willChange: "transform",
+          }}
+        >
+          <svg viewBox={`0 0 ${size} ${size}`} width="100%" style={{ display: "block" }}>
+            <circle cx={c} cy={c} r={r + 8} fill="#78350f" />
+            {prizes.map((p, i) => {
+              const a1 = i * sliceAngle;
+              const a2 = (i + 1) * sliceAngle;
+              const [x1, y1] = wheelPoint(c, c, r, a1);
+              const [x2, y2] = wheelPoint(c, c, r, a2);
+              const large = sliceAngle > 180 ? 1 : 0;
+              let color = WHEEL_COLORS[i % WHEEL_COLORS.length];
+              if (i === n - 1 && n > 1 && color === WHEEL_COLORS[0]) {
+                color = WHEEL_COLORS[(i + 2) % WHEEL_COLORS.length];
+              }
+              const mid = a1 + sliceAngle / 2;
+              const label = p.label.length > 14 ? p.label.slice(0, 13) + "..." : p.label;
+              return (
+                <g key={i}>
+                  <path
+                    d={`M ${c} ${c} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`}
+                    fill={color}
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                  <text
+                    x={c + r - 12}
+                    y={c}
+                    transform={`rotate(${mid - 90} ${c} ${c})`}
+                    textAnchor="end"
+                    dominantBaseline="middle"
+                    fill="#ffffff"
+                    fontSize={fontSize}
+                    fontWeight="800"
+                    style={{ paintOrder: "stroke" }}
+                    stroke="rgba(0,0,0,0.45)"
+                    strokeWidth="3"
+                  >
+                    {label}
+                  </text>
+                </g>
+              );
+            })}
+            <circle cx={c} cy={c} r="16" fill="#ffffff" stroke="#78350f" strokeWidth="4" />
+          </svg>
+        </div>
+      </div>
+      {phase === "ready" && (
+        <div className="w-full mt-5">
+          <BigButton t={t} tone="subtle" onClick={spin}>
+            Pörgess!
+          </BigButton>
+        </div>
+      )}
+      {phase === "done" && winner && (
+        <>
+          <p className={`text-2xl font-extrabold text-center mt-4 ${winner.none ? t.muted : t.score}`}>{winner.label}</p>
+          {winner.none && <p className={`text-sm text-center mt-1 ${t.faint}`}>Legközelebb szerencsésebb leszel!</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ---------- main component ----------
 
 export default function VocabTrainer() {
@@ -556,6 +702,7 @@ export default function VocabTrainer() {
   const [showInfo, setShowInfo] = useState(false);
   const [maxQuestions, setMaxQuestions] = useState(DEFAULT_MAX_QUESTIONS);
   const [maxQuestionsInput, setMaxQuestionsInput] = useState(String(DEFAULT_MAX_QUESTIONS));
+  const [prizeLog, setPrizeLog] = useState([]);
 
   // session state
   const [sessionType, setSessionType] = useState("practice"); // practice, quick, exam
@@ -582,10 +729,11 @@ export default function VocabTrainer() {
 
   useEffect(() => {
     (async () => {
-      const { words: w, progress: p, theme, maxQuestions: mq } = await loadData();
+      const { words: w, progress: p, theme, maxQuestions: mq, prizes: pl } = await loadData();
       setDark(theme === "dark");
       setMaxQuestions(mq);
       setMaxQuestionsInput(String(mq));
+      setPrizeLog(pl);
       if (w && w.length > 0) {
         setWords(w);
         setProgress(ensureProgress(w, p));
@@ -813,6 +961,34 @@ export default function VocabTrainer() {
     setScreen("setup");
   }
 
+  // Wheel prize log: newest first, capped at 100 entries. Not touched by the progress reset.
+  function recordPrize(prize) {
+    const entry = {
+      id: `${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+      label: prize.label,
+      date: new Date().toISOString(),
+      redeemed: false,
+      redeemedAt: null,
+    };
+    setPrizeLog((prev) => {
+      const updated = [entry, ...prev].slice(0, 100);
+      saveWheelPrizes(updated);
+      return updated;
+    });
+  }
+
+  function togglePrizeRedeemed(id) {
+    setPrizeLog((prev) => {
+      const updated = prev.map((p) =>
+        p.id === id
+          ? { ...p, redeemed: !p.redeemed, redeemedAt: !p.redeemed ? new Date().toISOString() : null }
+          : p
+      );
+      saveWheelPrizes(updated);
+      return updated;
+    });
+  }
+
   function handleResetProgress() {
     const fresh = ensureProgress(words, {});
     setProgress(fresh);
@@ -980,6 +1156,48 @@ export default function VocabTrainer() {
               </div>
             ))}
         </div>
+
+        {(WHEEL_CONFIG.enabled || prizeLog.length > 0) && (
+          <div className={`rounded-2xl border-2 p-3 mb-5 ${t.mascotBubble}`}>
+            <p className={`text-xs font-bold mb-1 ${t.heading}`}>Nyeremények</p>
+            <p className={`text-xs mb-2 ${t.muted}`}>
+              {prizeLog.length === 0
+                ? "Még nem volt pörgetés."
+                : `Beváltásra vár: ${prizeLog.filter((p) => !p.redeemed).length}`}
+            </p>
+            {prizeLog.length > 0 && (
+              <div className="max-h-48 overflow-y-auto pr-1 ios-scroll space-y-2">
+                {prizeLog.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p
+                        className={`text-sm font-medium truncate ${
+                          p.redeemed ? "line-through " + t.faint : t.heading
+                        }`}
+                      >
+                        {p.label}
+                      </p>
+                      <p className={`text-xs ${t.faint}`}>
+                        {formatPrizeDate(p.date)}
+                        {p.redeemed ? " - beváltva" : ""}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => togglePrizeRedeemed(p.id)}
+                      className={
+                        p.redeemed
+                          ? `shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold border-2 ${t.optionBase}`
+                          : "shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold bg-lime-500 hover:bg-lime-400 text-white"
+                      }
+                    >
+                      {p.redeemed ? "Visszavon" : "Beváltva"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className={`rounded-2xl border-2 p-3 mb-5 ${t.mascotBubble}`}>
           <label htmlFor="maxq" className={`block text-xs font-bold mb-1 ${t.heading}`}>
@@ -1188,6 +1406,7 @@ export default function VocabTrainer() {
           {correctCount} / {uniqueWords} szó ment elsőre
         </p>
         <p className={`text-center text-sm mb-6 ${t.muted}`}>{msg}</p>
+        {isWheelEligible(sessionType, uniqueWords, missed.length) && <WheelOfFortune t={t} onWin={recordPrize} />}
         {missed.length > 0 && (
           <div className="mb-6">
             <ul className={`space-y-1 ${t.heading}`}>
@@ -1226,6 +1445,7 @@ export default function VocabTrainer() {
           {examCorrect} / {examTotal}
         </p>
         <p className={`text-center text-sm mb-6 ${t.muted}`}>{msg}</p>
+        {isWheelEligible("exam", examTotal, missed.length) && <WheelOfFortune t={t} onWin={recordPrize} />}
         {missed.length > 0 && (
           <div className="mb-6">
             <p className={`text-sm mb-2 ${t.muted}`}>Bizonytalan szavak:</p>
