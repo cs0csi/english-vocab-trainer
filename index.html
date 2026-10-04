@@ -18,12 +18,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="words.js"></script>
 <script>
 // ---------- app version and update check ----------
 // Bump APP_VERSION on every release (any change to index.html). The running
 // page compares it with the value in the freshest index.html on the server.
-window.APP_VERSION = "2026-10-04-6";
+window.APP_VERSION = "2026-10-04-8";
 (function () {
   var VERSION_RE = /window\.APP_VERSION\s*=\s*"([^"]+)"/;
   var lastCheck = 0;
@@ -71,6 +70,9 @@ window.APP_VERSION = "2026-10-04-6";
     bar.appendChild(btn);
     document.body.appendChild(bar);
   }
+
+  // Load words.js with the version in the URL so a new version never reuses a cached word list.
+  document.write('<script src="words.js?v=' + encodeURIComponent(window.APP_VERSION) + '"><\/script>');
 
   // On startup: if a newer version exists, reload into it right away (nothing is in progress yet).
   // The sessionStorage guard prevents a reload loop if the server briefly still serves the old file.
@@ -304,6 +306,10 @@ function getWeakWords(words, progress, threshold = 2) {
   });
 }
 
+function countBelowLevel(words, progress, minLevel) {
+  return words.filter((w) => (progress[keyOf(w)]?.level ?? 0) < minLevel).length;
+}
+
 function pickDistractorWords(words, correct, count) {
   const others = words.filter((w) => keyOf(w) !== keyOf(correct));
   return shuffle(others).slice(0, Math.min(count, others.length));
@@ -452,6 +458,10 @@ const DARK = {
 };
 
 // ---------- storage ----------
+
+// Banánpróba stays locked until every word has reached at least this level
+// (0-1 = green, 2-3 = yellow, 4+ = ripe). 2 means "at least yellow".
+const EXAM_UNLOCK_LEVEL = 2;
 
 const DEFAULT_MAX_QUESTIONS = 25;
 
@@ -1150,6 +1160,7 @@ function VocabTrainer() {
 
   function beginSession(type) {
     const exam = type === "exam";
+    if (exam && (words.length === 0 || countBelowLevel(words, progress, EXAM_UNLOCK_LEVEL) > 0)) return;
     setSessionType(type);
     setIsExam(exam);
     setMissed([]);
@@ -1398,6 +1409,8 @@ function VocabTrainer() {
 
   if (screen === "menu") {
     const weakWords = getWeakWords(words, progress);
+    const greenCount = countBelowLevel(words, progress, EXAM_UNLOCK_LEVEL);
+    const examLocked = words.length === 0 || greenCount > 0;
     return (
       <Shell t={t} dark={dark} onToggle={toggleDark}>
         <div className="flex items-center justify-between mb-1">
@@ -1438,9 +1451,14 @@ function VocabTrainer() {
           <BigButton t={t} tone="subtle" disabled={weakWords.length === 0} onClick={() => beginSession("quick")}>
             {weakWords.length > 0 ? `Banánfrissítő (${weakWords.length})` : "Banánfrissítő"}
           </BigButton>
-          <BigButton t={t} onClick={() => beginSession("exam")} tone="secondary">
+          <BigButton t={t} onClick={() => beginSession("exam")} tone="secondary" disabled={examLocked}>
             Banánpróba
           </BigButton>
+          {examLocked && words.length > 0 && (
+            <p className={`text-xs text-center ${t.faint}`}>
+              A Banánpróba még zárva: {greenCount} szó még zöld. Ha mind legalább sárga, megnyílik.
+            </p>
+          )}
         </div>
       </Shell>
     );
@@ -1457,6 +1475,10 @@ function VocabTrainer() {
       else goodList.push(w);
     });
     const total = words.length || 1;
+    const winnablePrizes = WHEEL_CONFIG.enabled
+      ? (WHEEL_CONFIG.prizes || []).filter((p) => p && p.label && p.weight > 0 && !p.none)
+      : [];
+    const pendingPrizes = prizeLog.filter((p) => !p.redeemed);
     const sections = [
       { key: "weak", label: "🍌 Még zöld", list: weakList, barBg: "bg-rose-400", textCls: t.catWeak },
       { key: "mid", label: "🍌 Érik már", list: midList, barBg: "bg-amber-400", textCls: t.catMid },
@@ -1481,6 +1503,34 @@ function VocabTrainer() {
           <div className={`rounded-2xl border-2 p-3 mb-4 text-xs leading-relaxed ${t.mascotBubble}`}>
             Minden kör végén banánt kapsz: minél több szó megy elsőre, annál több banán jár. Lent azt látod, melyik
             szó hol tart az érésben: zöld = még tanulod, érik = egyre jobban megy, teljesen érett = magabiztosan tudod.
+          </div>
+        )}
+
+        {(winnablePrizes.length > 0 || pendingPrizes.length > 0) && (
+          <div className={`rounded-2xl border-2 p-3 mb-4 ${t.mascotBubble}`}>
+            {pendingPrizes.length > 0 && (
+              <div className={winnablePrizes.length > 0 ? "mb-3" : ""}>
+                <p className={`text-xs font-bold mb-1 ${t.catGood}`}>Megnyerted, még nem váltottad be:</p>
+                <ul className={`text-sm font-semibold space-y-0.5 ${t.heading}`}>
+                  {pendingPrizes.map((p) => (
+                    <li key={p.id}>{p.label}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {winnablePrizes.length > 0 && (
+              <div>
+                <p className={`text-xs font-bold mb-1 ${t.heading}`}>Ezeket nyerheted:</p>
+                <ul className={`text-sm space-y-0.5 ${t.heading}`}>
+                  {winnablePrizes.map((p, i) => (
+                    <li key={i}>{p.label}</li>
+                  ))}
+                </ul>
+                <p className={`text-xs mt-2 ${t.faint}`}>
+                  Hibátlan kör után (legalább {WHEEL_CONFIG.minWords} szóval) pörgethetsz a szerencsekeréken.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
