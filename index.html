@@ -19,6 +19,81 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="words.js"></script>
+<script>
+// ---------- app version and update check ----------
+// Bump APP_VERSION on every release (any change to index.html). The running
+// page compares it with the value in the freshest index.html on the server.
+window.APP_VERSION = "2026-10-04-6";
+(function () {
+  var VERSION_RE = /window\.APP_VERSION\s*=\s*"([^"]+)"/;
+  var lastCheck = 0;
+
+  // Fetches index.html bypassing every cache and returns its APP_VERSION (or null on failure).
+  window.fetchLatestVersion = function () {
+    var url = location.pathname + "?nocache=" + Date.now();
+    return fetch(url, { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.text() : ""; })
+      .then(function (text) {
+        var m = VERSION_RE.exec(text);
+        return m ? m[1] : null;
+      })
+      .catch(function () { return null; });
+  };
+
+  // Reloads under a new URL so the browser cannot serve the old cached copy.
+  window.reloadToLatest = function (latest) {
+    location.replace(location.pathname + "?v=" + encodeURIComponent(latest));
+  };
+
+  function newerVersion() {
+    return window.fetchLatestVersion().then(function (latest) {
+      return latest && latest !== window.APP_VERSION ? latest : null;
+    });
+  }
+
+  function showBanner(latest) {
+    if (document.getElementById("update-banner")) return;
+    var bar = document.createElement("div");
+    bar.id = "update-banner";
+    bar.style.cssText =
+      "position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom, 0px));" +
+      "z-index:9999;display:flex;align-items:center;justify-content:space-between;gap:12px;" +
+      "padding:10px 14px;border-radius:16px;background:#16a34a;color:#fff;font:600 14px sans-serif;" +
+      "box-shadow:0 4px 14px rgba(0,0,0,0.3)";
+    var text = document.createElement("span");
+    text.textContent = "Új verzió érhető el";
+    var btn = document.createElement("button");
+    btn.textContent = "Frissítés";
+    btn.style.cssText =
+      "border:0;border-radius:12px;padding:8px 14px;background:#fff;color:#166534;font:700 14px sans-serif";
+    btn.onclick = function () { window.reloadToLatest(latest); };
+    bar.appendChild(text);
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+  }
+
+  // On startup: if a newer version exists, reload into it right away (nothing is in progress yet).
+  // The sessionStorage guard prevents a reload loop if the server briefly still serves the old file.
+  newerVersion().then(function (latest) {
+    if (!latest) return;
+    var tried = null;
+    try { tried = sessionStorage.getItem("updateTriedFor"); } catch (e) {}
+    if (tried === latest) return;
+    try { sessionStorage.setItem("updateTriedFor", latest); } catch (e) {}
+    window.reloadToLatest(latest);
+  });
+
+  // When the app comes back to the foreground, only offer the update (a session may be running).
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") return;
+    if (Date.now() - lastCheck < 30000) return;
+    lastCheck = Date.now();
+    newerVersion().then(function (latest) {
+      if (latest) showBanner(latest);
+    });
+  });
+})();
+</script>
 <style>
   html, body {
     height: 100%;
@@ -55,7 +130,7 @@
 <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 // =====================================================================
 // LUCKY WHEEL SETTINGS  (edit this block only)
@@ -339,6 +414,7 @@ const LIGHT = {
     secondary: "bg-sky-500 hover:bg-sky-400 active:translate-y-1 text-white border-b-4 border-sky-700",
     subtle: "bg-amber-400 hover:bg-amber-300 active:translate-y-1 text-amber-950 border-b-4 border-amber-600",
     ghost: "bg-white hover:bg-slate-50 text-slate-700 border-2 border-slate-300 active:translate-y-1",
+    accent: "bg-violet-500 hover:bg-violet-400 active:translate-y-1 text-white border-b-4 border-violet-700",
   },
 };
 
@@ -371,6 +447,7 @@ const DARK = {
     secondary: "bg-sky-500 hover:bg-sky-400 active:translate-y-1 text-slate-950 border-b-4 border-sky-700",
     subtle: "bg-amber-400 hover:bg-amber-300 active:translate-y-1 text-amber-950 border-b-4 border-amber-600",
     ghost: "bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 active:translate-y-1",
+    accent: "bg-violet-500 hover:bg-violet-400 active:translate-y-1 text-white border-b-4 border-violet-700",
   },
 };
 
@@ -712,6 +789,231 @@ function WheelOfFortune({ t, onWin }) {
   );
 }
 
+// ---------- flash cards (swipe) ----------
+// Free browsing practice: swipe right = "know it", swipe left = "not yet" (comes back a few cards later),
+// tap = flip. It never touches the saved progress or the banana rewards.
+
+const SWIPE_THRESHOLD = 90;
+const SWIPE_EXIT_MS = 220;
+const REQUEUE_GAP = 5;
+
+function makeCardQueue(deck) {
+  return shuffle(deck).map((c, i) => ({ ...c, uid: i, first: true }));
+}
+
+function FlashCards({ t, dark, onToggle, deck, onExit }) {
+  const total = deck.length;
+  const [queue, setQueue] = useState(() => makeCardQueue(deck));
+  const [flipped, setFlipped] = useState(false);
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [exitDir, setExitDir] = useState(null); // "left", "right" or null
+  const [firstKnown, setFirstKnown] = useState(0);
+  const startX = useRef(null);
+  const moved = useRef(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const card = queue[0];
+
+  function decide(known) {
+    if (!card || exitDir) return;
+    const wasFirst = card.first;
+    setExitDir(known ? "right" : "left");
+    timerRef.current = setTimeout(() => {
+      setQueue((q) => {
+        const [head, ...rest] = q;
+        if (known) return rest;
+        const next = [...rest];
+        next.splice(Math.min(REQUEUE_GAP, rest.length), 0, { ...head, first: false });
+        return next;
+      });
+      if (known && wasFirst) setFirstKnown((n) => n + 1);
+      setFlipped(false);
+      setDragX(0);
+      setDragging(false);
+      setExitDir(null);
+    }, SWIPE_EXIT_MS);
+  }
+
+  function onPointerDown(e) {
+    if (exitDir) return;
+    startX.current = e.clientX;
+    moved.current = false;
+    setDragging(true);
+    if (e.currentTarget.setPointerCapture) {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch (err) {}
+    }
+  }
+
+  function onPointerMove(e) {
+    if (startX.current === null) return;
+    const dx = e.clientX - startX.current;
+    if (Math.abs(dx) > 8) moved.current = true;
+    setDragX(dx);
+  }
+
+  function onPointerUp(e) {
+    if (startX.current === null) return;
+    const dx = e.clientX - startX.current;
+    startX.current = null;
+    setDragging(false);
+    if (dx > SWIPE_THRESHOLD) {
+      decide(true);
+    } else if (dx < -SWIPE_THRESHOLD) {
+      decide(false);
+    } else {
+      setDragX(0);
+      if (!moved.current) setFlipped((f) => !f);
+    }
+  }
+
+  function onPointerCancel() {
+    startX.current = null;
+    setDragging(false);
+    setDragX(0);
+  }
+
+  function restart() {
+    clearTimeout(timerRef.current);
+    setQueue(makeCardQueue(deck));
+    setFirstKnown(0);
+    setFlipped(false);
+    setDragX(0);
+    setDragging(false);
+    setExitDir(null);
+  }
+
+  if (!card) {
+    return (
+      <Shell t={t} dark={dark} onToggle={onToggle} onClose={onExit}>
+        <div className="flex flex-col items-center text-center mb-4">
+          <Monkey mood="celebrate" size={96} />
+          <h2 className={`text-2xl font-extrabold tracking-tight mt-2 ${t.heading}`}>Végigértél a kártyákon!</h2>
+        </div>
+        <p className={`text-center text-sm font-semibold mb-1 ${t.heading}`}>
+          {firstKnown} / {total} kártyát tudtál elsőre
+        </p>
+        <p className={`text-center text-sm mb-6 ${t.muted}`}>
+          Ez csak gyakorlás volt, nem számít bele a banánokba.
+        </p>
+        <div className="space-y-3">
+          <BigButton t={t} onClick={restart}>
+            Még egy kör
+          </BigButton>
+          <BigButton t={t} tone="ghost" onClick={onExit}>
+            Vissza a fára
+          </BigButton>
+        </div>
+      </Shell>
+    );
+  }
+
+  const frontText = card.dir === "en2hu" ? card.word.en : card.word.hu;
+  const backText = card.dir === "en2hu" ? card.word.hu : card.word.en;
+  const frontLabel = card.dir === "en2hu" ? "Angol" : "Magyar";
+  const backLabel = card.dir === "en2hu" ? "Magyar" : "Angol";
+
+  const shownX = exitDir === "right" ? 520 : exitDir === "left" ? -520 : dragX;
+  const swipeRatio = Math.max(-1, Math.min(1, shownX / SWIPE_THRESHOLD));
+  const faceBase = "absolute inset-0 rounded-3xl border-2 shadow-lg flex flex-col items-center justify-center p-4 text-center";
+  const backTone = dark
+    ? "bg-lime-900/40 border-lime-600 text-lime-100"
+    : "bg-lime-50 border-lime-400 text-lime-900";
+
+  return (
+    <Shell t={t} dark={dark} onToggle={onToggle} onClose={onExit}>
+      <div className="flex justify-between items-baseline mb-1">
+        <h2 className={`text-lg font-extrabold tracking-tight ${t.heading}`}>Majomkártyák</h2>
+        <span className={`text-xs ${t.faint}`}>Hátra: {queue.length}</span>
+      </div>
+      <ProgressBar value={total - queue.length} total={total} t={t} />
+
+      <div className="relative mb-4" style={{ height: 224 }}>
+        <div
+          key={card.uid}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+          className="absolute inset-0 cursor-grab"
+          style={{
+            perspective: 1000,
+            touchAction: "pan-y",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+            WebkitTouchCallout: "none",
+            transform: `translateX(${shownX}px) rotate(${shownX / 18}deg)`,
+            transition: dragging ? "none" : `transform ${SWIPE_EXIT_MS}ms ease-out`,
+          }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              transformStyle: "preserve-3d",
+              WebkitTransformStyle: "preserve-3d",
+              transition: "transform 0.4s",
+              transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            }}
+          >
+            <div
+              className={`${faceBase} ${t.mascotBubble}`}
+              style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
+            >
+              <span className={`text-xs font-bold uppercase tracking-wide mb-2 ${t.faint}`}>{frontLabel}</span>
+              <span className="text-3xl font-extrabold break-words max-w-full">{frontText}</span>
+            </div>
+            <div
+              className={`${faceBase} ${backTone}`}
+              style={{
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+                transform: "rotateY(180deg)",
+              }}
+            >
+              <span className="text-xs font-bold uppercase tracking-wide mb-2 opacity-60">{backLabel}</span>
+              <span className="text-3xl font-extrabold break-words max-w-full">{backText}</span>
+            </div>
+          </div>
+          <span
+            className="absolute top-3 left-3 rounded-lg border-2 border-lime-500 px-2 py-0.5 text-sm font-extrabold text-lime-600 pointer-events-none"
+            style={{ opacity: Math.max(0, swipeRatio), transform: "rotate(-12deg)" }}
+          >
+            Tudom
+          </span>
+          <span
+            className="absolute top-3 right-3 rounded-lg border-2 border-rose-400 px-2 py-0.5 text-sm font-extrabold text-rose-500 pointer-events-none"
+            style={{ opacity: Math.max(0, -swipeRatio), transform: "rotate(12deg)" }}
+          >
+            Még nem
+          </span>
+        </div>
+      </div>
+
+      <p className={`text-center text-xs mb-4 ${t.faint}`}>
+        Koppints a megfordításhoz. Húzd jobbra, ha tudod, balra, ha még nem.
+      </p>
+      <div className="flex gap-3">
+        <button
+          onClick={() => decide(false)}
+          className="flex-1 rounded-2xl py-3 text-base font-bold bg-rose-500 hover:bg-rose-400 active:translate-y-1 text-white border-b-4 border-rose-700"
+        >
+          Még nem
+        </button>
+        <button
+          onClick={() => decide(true)}
+          className={`flex-1 rounded-2xl py-3 text-base font-bold active:translate-y-1 ${t.btn.primary}`}
+        >
+          Tudom
+        </button>
+      </div>
+    </Shell>
+  );
+}
+
 // ---------- main component ----------
 
 function VocabTrainer() {
@@ -728,6 +1030,11 @@ function VocabTrainer() {
   const [maxQuestions, setMaxQuestions] = useState(DEFAULT_MAX_QUESTIONS);
   const [maxQuestionsInput, setMaxQuestionsInput] = useState(String(DEFAULT_MAX_QUESTIONS));
   const [prizeLog, setPrizeLog] = useState([]);
+  const [updateMsg, setUpdateMsg] = useState("");
+  const [cardScope, setCardScope] = useState("all"); // "all" or "weak"
+  const [cardDir, setCardDir] = useState("mixed"); // "mixed", "en2hu" or "hu2en"
+  const [cardDeck, setCardDeck] = useState([]);
+  const [cardRun, setCardRun] = useState(0);
 
   // session state
   const [sessionType, setSessionType] = useState("practice"); // practice, quick, exam
@@ -986,6 +1293,32 @@ function VocabTrainer() {
     setScreen("setup");
   }
 
+  function startCards() {
+    const pool = cardScope === "weak" ? getWeakWords(words, progress) : words;
+    if (pool.length === 0) return;
+    setCardDeck(
+      pool.map((w) => ({
+        word: w,
+        dir: cardDir === "mixed" ? (Math.random() < 0.5 ? "en2hu" : "hu2en") : cardDir,
+      }))
+    );
+    setCardRun((n) => n + 1);
+    setScreen("cards");
+  }
+
+  async function handleCheckUpdate() {
+    setUpdateMsg("Keresés...");
+    const latest = await window.fetchLatestVersion();
+    if (!latest) {
+      setUpdateMsg("Nem sikerült ellenőrizni (nincs internet?).");
+    } else if (latest === window.APP_VERSION) {
+      setUpdateMsg("Ez a legfrissebb verzió.");
+    } else {
+      setUpdateMsg("Új verzió van, újratöltés...");
+      window.reloadToLatest(latest);
+    }
+  }
+
   // Wheel prize log: newest first, capped at 100 entries. Not touched by the progress reset.
   function recordPrize(prize) {
     const entry = {
@@ -1067,22 +1400,25 @@ function VocabTrainer() {
     const weakWords = getWeakWords(words, progress);
     return (
       <Shell t={t} dark={dark} onToggle={toggleDark}>
-        <div className="flex justify-end mb-1">
-          <div className="flex gap-3">
-            <button onClick={openWordListEditor} className={`text-xs ${t.faint}`}>
-              szólista
-            </button>
-            <button
-              onClick={() => {
-                setConfirmReset(false);
-                setShowInfo(false);
-                setScreen("progressView");
-              }}
-              className={`text-xs ${t.faint}`}
-            >
-              haladás
-            </button>
-          </div>
+        <div className="flex items-center justify-between mb-1">
+          <button
+            onClick={() => {
+              setConfirmReset(false);
+              setScreen("adultView");
+            }}
+            className={`text-xs ${t.faint}`}
+          >
+            gondozó
+          </button>
+          <button
+            onClick={() => {
+              setShowInfo(false);
+              setScreen("progressView");
+            }}
+            className={`text-xs ${t.faint}`}
+          >
+            banánjaim
+          </button>
         </div>
         <div className="flex flex-col items-center text-center mb-6">
           <Monkey mood="wave" size={100} />
@@ -1093,6 +1429,9 @@ function VocabTrainer() {
           <p className={`mt-3 text-sm ${t.muted}`}>{words.length} szó a listában</p>
         </div>
         <div className="space-y-3">
+          <BigButton t={t} tone="accent" onClick={() => setScreen("cardsSetup")}>
+            Majomkártyák
+          </BigButton>
           <BigButton t={t} onClick={() => beginSession("practice")}>
             Majomiskola
           </BigButton>
@@ -1126,7 +1465,7 @@ function VocabTrainer() {
     return (
       <Shell t={t} dark={dark} onToggle={toggleDark}>
         <div className="flex items-start justify-between gap-2 mb-1">
-          <h2 className={`text-2xl font-extrabold tracking-tight ${t.heading}`}>Haladás</h2>
+          <h2 className={`text-2xl font-extrabold tracking-tight ${t.heading}`}>Banánjaim</h2>
           <button
             onClick={() => setShowInfo((v) => !v)}
             aria-label="Hogyan működik?"
@@ -1140,9 +1479,8 @@ function VocabTrainer() {
 
         {showInfo && (
           <div className={`rounded-2xl border-2 p-3 mb-4 text-xs leading-relaxed ${t.mascotBubble}`}>
-            Minden Majomiskola / Banánfrissítő / Banánpróba kör végén banánt kap a gyerek a teljesítménye alapján —
-            minél több szó megy elsőre, annál több banán jár. Idelent pedig az látszik, melyik szó hol tart az
-            "éréseben": zöld = még tanulja, érik = egyre jobban megy, teljesen érett = magabiztosan tudja.
+            Minden kör végén banánt kapsz: minél több szó megy elsőre, annál több banán jár. Lent azt látod, melyik
+            szó hol tart az érésben: zöld = még tanulod, érik = egyre jobban megy, teljesen érett = magabiztosan tudod.
           </div>
         )}
 
@@ -1180,6 +1518,27 @@ function VocabTrainer() {
                 </div>
               </div>
             ))}
+        </div>
+
+        <div className="space-y-2">
+          <BigButton t={t} tone="ghost" onClick={() => setScreen("menu")}>
+            Vissza a fára
+          </BigButton>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "adultView") {
+    return (
+      <Shell t={t} dark={dark} onToggle={toggleDark}>
+        <h2 className={`text-2xl font-extrabold tracking-tight mb-1 ${t.heading}`}>Majomgondozó</h2>
+        <p className={`text-sm mb-4 ${t.muted}`}>Szólista, nyeremények és beállítások.</p>
+
+        <div className="mb-5">
+          <BigButton t={t} tone="subtle" onClick={openWordListEditor}>
+            Szólista szerkesztése
+          </BigButton>
         </div>
 
         {(WHEEL_CONFIG.enabled || prizeLog.length > 0) && (
@@ -1244,6 +1603,14 @@ function VocabTrainer() {
           />
         </div>
 
+        <div className="flex items-center justify-between gap-2 mb-1 px-1">
+          <span className={`text-[10px] opacity-60 ${t.faint}`}>Verzió: {window.APP_VERSION}</span>
+          <button onClick={handleCheckUpdate} className={`text-xs ${t.faint}`}>
+            Frissítés keresése
+          </button>
+        </div>
+        {updateMsg && <p className={`text-xs mb-3 px-1 ${t.muted}`}>{updateMsg}</p>}
+
         <div className="space-y-2">
           <BigButton t={t} tone="ghost" onClick={() => setScreen("menu")}>
             Vissza a fára
@@ -1278,6 +1645,74 @@ function VocabTrainer() {
           )}
         </div>
       </Shell>
+    );
+  }
+
+  if (screen === "cardsSetup") {
+    const weakCount = getWeakWords(words, progress).length;
+    const chip = (active, disabled) =>
+      `flex-1 rounded-xl border-2 px-2 py-2 text-sm font-bold transition disabled:opacity-40 ${
+        active ? "bg-lime-500 border-lime-600 text-white" : t.optionBase
+      }`;
+    return (
+      <Shell t={t} dark={dark} onToggle={toggleDark} onClose={() => setScreen("menu")}>
+        <div className="flex flex-col items-center text-center mb-4">
+          <Monkey mood="wave" size={80} />
+          <h2 className={`text-2xl font-extrabold tracking-tight mt-1 ${t.heading}`}>Majomkártyák</h2>
+          <p className={`text-sm mt-1 ${t.muted}`}>
+            Húzogatós gyakorlás. Nem számít bele a banánokba, szabadon próbálkozhatsz.
+          </p>
+        </div>
+
+        <p className={`text-xs font-bold mb-1 ${t.heading}`}>Melyik szavak?</p>
+        <div className="flex gap-2 mb-4">
+          <button onClick={() => setCardScope("all")} className={chip(cardScope === "all")}>
+            Mind ({words.length})
+          </button>
+          <button
+            onClick={() => setCardScope("weak")}
+            disabled={weakCount === 0}
+            className={chip(cardScope === "weak")}
+          >
+            Bizonytalanok ({weakCount})
+          </button>
+        </div>
+
+        <p className={`text-xs font-bold mb-1 ${t.heading}`}>Melyik irányban?</p>
+        <div className="flex gap-2 mb-6">
+          <button onClick={() => setCardDir("mixed")} className={chip(cardDir === "mixed")}>
+            Vegyes
+          </button>
+          <button onClick={() => setCardDir("en2hu")} className={chip(cardDir === "en2hu")}>
+            Angol - magyar
+          </button>
+          <button onClick={() => setCardDir("hu2en")} className={chip(cardDir === "hu2en")}>
+            Magyar - angol
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <BigButton t={t} onClick={startCards} disabled={cardScope === "weak" && weakCount === 0}>
+            Indulhat!
+          </BigButton>
+          <BigButton t={t} tone="ghost" onClick={() => setScreen("menu")}>
+            Vissza a fára
+          </BigButton>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "cards") {
+    return (
+      <FlashCards
+        key={cardRun}
+        t={t}
+        dark={dark}
+        onToggle={toggleDark}
+        deck={cardDeck}
+        onExit={() => setScreen("menu")}
+      />
     );
   }
 
