@@ -22,7 +22,7 @@
 // ---------- app version and update check ----------
 // Bump APP_VERSION on every release (any change to index.html). The running
 // page compares it with the value in the freshest index.html on the server.
-window.APP_VERSION = "2026-10-04-8";
+window.APP_VERSION = "2026-10-04-9";
 (function () {
   var VERSION_RE = /window\.APP_VERSION\s*=\s*"([^"]+)"/;
   var lastCheck = 0;
@@ -147,17 +147,19 @@ const { useState, useEffect, useRef } = React;
 // minWords     : minimum number of words in the session.
 // spinSeconds  : length of the spin animation.
 // extraTurns   : full extra rotations before the wheel stops (visual only).
-// prizes       : label = text shown on the wheel and in the result,
-//                weight = relative chance. The chance of a prize is
-//                weight / (sum of all weights). Example: weights
-//                30, 20, 10 -> 50%, 33.3%, 16.7%. Weight 0 hides a prize.
-//                none: true marks a "no prize" slice (for example "no banana
-//                this time"). It can be spun like any other slice, but it is
-//                not saved to the prize log in the parent view.
-//                Every prize gets an equal-sized slice on the wheel, no
-//                matter its weight. Labels longer than 14 characters are
-//                shortened on the wheel (the result shows the full text).
-//                Use at least 2 prizes with a weight above 0.
+// prizes       : label  = text shown on the wheel and in the result,
+//                chance = chance in PERCENT (0.5 means half a percent).
+//                The remaining percentage (100 minus the sum of all chances)
+//                automatically becomes the "no prize" slice. The sum should
+//                stay at or below 100; if it is higher, the chances are
+//                scaled down proportionally and there is no "no prize" slice.
+//                A prize with chance 0 is hidden. Labels longer than 14
+//                characters are shortened on the wheel (the result shows the
+//                full text).
+// noPrizeLabel : text of the automatic "no prize" slice. It is not saved to
+//                the prize log in the parent view.
+//                Every slice has the same size on the wheel, whatever its
+//                chance is. The real odds are shown in the parent menu.
 const WHEEL_CONFIG = {
   enabled: true,
   modes: ["exam"],
@@ -165,15 +167,32 @@ const WHEEL_CONFIG = {
   spinSeconds: 5,
   extraTurns: 5,
   prizes: [
-    { label: "Extra 15 perc játék", weight: 10 },
-    { label: "Chips", weight: 5 },
-    { label: "Te választod a vacsorát", weight: 3 },
-    { label: "Közös társasjáték", weight: 3 },
-    { label: "Mozi", weight: 3 },
-    { label: "Szuper jackpot", weight: 1 },
-    { label: "Most nincs banán", weight: 75, none: true },
+    { label: "Extra 15 perc játék", chance: 15 },
+    { label: "Chips", chance: 5 },
+    { label: "Te választod a vacsorát", chance: 10 },
+    { label: "Közös társasjáték", chance: 5 },
+    { label: "Mozi", chance: 2 },
+    { label: "Szuper jackpot", chance: 0.5 },
   ],
+  noPrizeLabel: "Most nincs banán",
 };
+
+// Builds the wheel slices from the config: the listed prizes plus the automatic "no prize" slice.
+function getWheelSlices() {
+  const listed = (WHEEL_CONFIG.prizes || []).filter((p) => p && p.label && p.chance > 0);
+  const sum = listed.reduce((acc, p) => acc + p.chance, 0);
+  const scale = sum > 100 ? 100 / sum : 1;
+  const slices = listed.map((p) => ({ label: p.label, chance: p.chance * scale, none: false }));
+  const rest = 100 - sum * scale;
+  if (rest > 0.0001) {
+    slices.push({ label: WHEEL_CONFIG.noPrizeLabel || "Most nincs nyeremény", chance: rest, none: true });
+  }
+  return slices;
+}
+
+function formatChance(x) {
+  return String(Math.round(x * 100) / 100).replace(".", ",");
+}
 
 // ---------- mascot copy ----------
 
@@ -669,7 +688,7 @@ function isWheelEligible(sessionType, wordCount, missedCount) {
 }
 
 function WheelOfFortune({ t, onWin }) {
-  const prizes = (WHEEL_CONFIG.prizes || []).filter((p) => p && p.label && p.weight > 0);
+  const prizes = getWheelSlices().map((p) => ({ ...p, weight: p.chance }));
   const [phase, setPhase] = useState("ready"); // ready, spinning, done
   const [rotation, setRotation] = useState(0);
   const [winner, setWinner] = useState(null);
@@ -1476,7 +1495,7 @@ function VocabTrainer() {
     });
     const total = words.length || 1;
     const winnablePrizes = WHEEL_CONFIG.enabled
-      ? (WHEEL_CONFIG.prizes || []).filter((p) => p && p.label && p.weight > 0 && !p.none)
+      ? getWheelSlices().filter((p) => !p.none)
       : [];
     const pendingPrizes = prizeLog.filter((p) => !p.redeemed);
     const sections = [
@@ -1599,6 +1618,11 @@ function VocabTrainer() {
                 ? "Még nem volt pörgetés."
                 : `Beváltásra vár: ${prizeLog.filter((p) => !p.redeemed).length}`}
             </p>
+            {WHEEL_CONFIG.enabled && (
+              <p className={`text-[11px] mb-2 ${t.faint}`}>
+                Esélyek: {getWheelSlices().map((p) => `${p.label} ${formatChance(p.chance)}%`).join(", ")}
+              </p>
+            )}
             {prizeLog.length > 0 && (
               <div className="max-h-48 overflow-y-auto pr-1 ios-scroll space-y-2">
                 {prizeLog.map((p) => (
