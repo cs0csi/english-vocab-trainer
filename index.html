@@ -22,7 +22,7 @@
 // ---------- app version and update check ----------
 // Bump APP_VERSION on every release (any change to index.html). The running
 // page compares it with the value in the freshest index.html on the server.
-window.APP_VERSION = "2026-10-04-9";
+window.APP_VERSION = "2026-10-16-1";
 (function () {
   var VERSION_RE = /window\.APP_VERSION\s*=\s*"([^"]+)"/;
   var lastCheck = 0;
@@ -73,6 +73,8 @@ window.APP_VERSION = "2026-10-04-9";
 
   // Load words.js with the version in the URL so a new version never reuses a cached word list.
   document.write('<script src="words.js?v=' + encodeURIComponent(window.APP_VERSION) + '"><\/script>');
+  // TEMP-MEGYEK: temporary county data
+  document.write('<script src="megyek.js?v=' + encodeURIComponent(window.APP_VERSION) + '"><\/script>');
 
   // On startup: if a newer version exists, reload into it right away (nothing is in progress yet).
   // The sessionStorage guard prevents a reload loop if the server briefly still serves the old file.
@@ -830,7 +832,17 @@ function makeCardQueue(deck) {
   return shuffle(deck).map((c, i) => ({ ...c, uid: i, first: true }));
 }
 
-function FlashCards({ t, dark, onToggle, deck, onExit }) {
+function FlashCards({
+  t,
+  dark,
+  onToggle,
+  deck,
+  onExit,
+  title = "Majomkártyák",
+  enLabel = "Angol",
+  huLabel = "Magyar",
+  endNote = "Ez csak gyakorlás volt, nem számít bele a banánokba.",
+}) {
   const total = deck.length;
   const [queue, setQueue] = useState(() => makeCardQueue(deck));
   const [flipped, setFlipped] = useState(false);
@@ -927,7 +939,7 @@ function FlashCards({ t, dark, onToggle, deck, onExit }) {
           {firstKnown} / {total} kártyát tudtál elsőre
         </p>
         <p className={`text-center text-sm mb-6 ${t.muted}`}>
-          Ez csak gyakorlás volt, nem számít bele a banánokba.
+          {endNote}
         </p>
         <div className="space-y-3">
           <BigButton t={t} onClick={restart}>
@@ -943,8 +955,8 @@ function FlashCards({ t, dark, onToggle, deck, onExit }) {
 
   const frontText = card.dir === "en2hu" ? card.word.en : card.word.hu;
   const backText = card.dir === "en2hu" ? card.word.hu : card.word.en;
-  const frontLabel = card.dir === "en2hu" ? "Angol" : "Magyar";
-  const backLabel = card.dir === "en2hu" ? "Magyar" : "Angol";
+  const frontLabel = card.dir === "en2hu" ? enLabel : huLabel;
+  const backLabel = card.dir === "en2hu" ? huLabel : enLabel;
 
   const shownX = exitDir === "right" ? 520 : exitDir === "left" ? -520 : dragX;
   const swipeRatio = Math.max(-1, Math.min(1, shownX / SWIPE_THRESHOLD));
@@ -956,7 +968,7 @@ function FlashCards({ t, dark, onToggle, deck, onExit }) {
   return (
     <Shell t={t} dark={dark} onToggle={onToggle} onClose={onExit}>
       <div className="flex justify-between items-baseline mb-1">
-        <h2 className={`text-lg font-extrabold tracking-tight ${t.heading}`}>Majomkártyák</h2>
+        <h2 className={`text-lg font-extrabold tracking-tight ${t.heading}`}>{title}</h2>
         <span className={`text-xs ${t.faint}`}>Hátra: {queue.length}</span>
       </div>
       <ProgressBar value={total - queue.length} total={total} t={t} />
@@ -1042,6 +1054,231 @@ function FlashCards({ t, dark, onToggle, deck, onExit }) {
     </Shell>
   );
 }
+
+// ---------- TEMP-MEGYEK-START ----------
+// Temporary county / county seat feature. To remove it, delete megyek.js, this block,
+// the two round buttons in the menu, the two county screens and startCountyCards().
+
+function getCounties() {
+  return Array.isArray(window.COUNTY_DATA) ? window.COUNTY_DATA : [];
+}
+
+function IconPin() {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z" />
+      <circle cx="12" cy="11" r="2.2" />
+    </svg>
+  );
+}
+
+function IconCity() {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 21h18" />
+      <path d="M5 21V9l5-3v15" />
+      <path d="M10 21V4l8 3v14" />
+      <path d="M13 10h2M13 14h2M7 12h1M7 16h1" />
+    </svg>
+  );
+}
+
+// Builds one multiple choice question. askSeat = true: the county is shown and the seat is asked.
+function makeCountyQuestion(item, all) {
+  const askSeat = Math.random() < 0.5;
+  const field = askSeat ? "seat" : "name";
+  const others = shuffle(all.filter((c) => c[field] !== item[field])).slice(0, 3);
+  return {
+    item,
+    askSeat,
+    prompt: askSeat ? item.name : item.seat,
+    answer: item[field],
+    options: shuffle([item, ...others]).map((c) => c[field]),
+  };
+}
+
+function initCountyRun() {
+  const all = getCounties();
+  const items = shuffle(all).map((c) => ({ item: c, retry: false }));
+  return {
+    items,
+    idx: 0,
+    q: items.length > 0 ? makeCountyQuestion(items[0].item, all) : null,
+    selected: null,
+    missed: [],
+    firstCorrect: 0,
+    done: false,
+    endMsg: "",
+  };
+}
+
+// Multiple choice county quiz. It never touches the saved progress, bananas or the wheel.
+function CountyQuiz({ t, dark, onToggle, onExit }) {
+  const [run, setRun] = useState(initCountyRun);
+  const [reaction, setReaction] = useState(null);
+  const total = getCounties().length;
+  const { items, idx, q, selected, missed, firstCorrect, done, endMsg } = run;
+
+  function pick(opt) {
+    if (selected !== null || !q) return;
+    const ok = opt === q.answer;
+    setReaction({ mood: ok ? "happy" : "oops", text: pickRandom(ok ? CORRECT_MESSAGES : WRONG_MESSAGES) });
+    setRun((r) => ({
+      ...r,
+      selected: opt,
+      firstCorrect: ok && !r.items[r.idx].retry ? r.firstCorrect + 1 : r.firstCorrect,
+      missed: ok || r.missed.some((m) => m.name === q.item.name) ? r.missed : [...r.missed, q.item],
+    }));
+  }
+
+  function next() {
+    if (selected === null) return;
+    const all = getCounties();
+    setReaction(null);
+    setRun((r) => {
+      let nextItems = r.items;
+      if (r.selected !== r.q.answer) {
+        // A wrong answer comes back a few questions later.
+        const at = Math.min(r.idx + 3, nextItems.length);
+        nextItems = [...nextItems.slice(0, at), { item: r.q.item, retry: true }, ...nextItems.slice(at)];
+      }
+      const nextIdx = r.idx + 1;
+      if (nextIdx >= nextItems.length) {
+        const msgs = r.missed.length === 0 ? PRACTICE_PERFECT_MESSAGES : PRACTICE_GOOD_MESSAGES;
+        return { ...r, items: nextItems, done: true, endMsg: pickRandom(msgs) };
+      }
+      return {
+        ...r,
+        items: nextItems,
+        idx: nextIdx,
+        q: makeCountyQuestion(nextItems[nextIdx].item, all),
+        selected: null,
+      };
+    });
+  }
+
+  if (total === 0 || !q) {
+    return (
+      <Shell t={t} dark={dark} onToggle={onToggle} onClose={onExit}>
+        <p className={`text-center ${t.muted}`}>Nincs betöltött megyelista (megyek.js).</p>
+      </Shell>
+    );
+  }
+
+  if (done) {
+    return (
+      <Shell t={t} dark={dark} onToggle={onToggle} onClose={onExit}>
+        <div className="flex flex-col items-center text-center mb-4">
+          <Monkey mood={missed.length === 0 ? "celebrate" : "happy"} size={96} />
+          <h2 className={`text-2xl font-extrabold tracking-tight mt-2 ${t.heading}`}>Kész a megyékkel!</h2>
+        </div>
+        <p className={`text-center text-sm font-semibold mb-1 ${t.heading}`}>
+          {firstCorrect} / {total} megye ment elsőre
+        </p>
+        <p className={`text-center text-sm mb-6 ${t.muted}`}>{endMsg}</p>
+        {missed.length > 0 && (
+          <ul className={`space-y-1 mb-6 ${t.heading}`}>
+            {missed.map((m) => (
+              <li key={m.name} className="text-sm">
+                <span className="font-medium">{m.name}</span> – {m.seat}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="space-y-3">
+          <BigButton
+            t={t}
+            onClick={() => {
+              setReaction(null);
+              setRun(initCountyRun());
+            }}
+          >
+            Még egy kör
+          </BigButton>
+          <BigButton t={t} tone="ghost" onClick={onExit}>
+            Vissza a fára
+          </BigButton>
+        </div>
+      </Shell>
+    );
+  }
+
+  const promptLabel = q.askSeat ? "Mi ennek a megyének a székhelye?" : "Melyik megye székhelye ez a város?";
+  const answered = selected !== null;
+
+  return (
+    <Shell t={t} dark={dark} onToggle={onToggle} onClose={onExit}>
+      <div className="flex justify-between items-center mb-3">
+        <span className={`text-xs font-semibold ${t.faint}`}>Megyék</span>
+        <span className={`text-xs ${t.faint}`}>
+          {idx + 1} / {items.length}
+        </span>
+      </div>
+      <ProgressBar value={idx} total={items.length} t={t} />
+      <div className="py-2">
+        <p className={`mb-2 text-center text-sm ${t.muted}`}>{promptLabel}</p>
+        <p className={`font-extrabold text-3xl mb-6 text-center tracking-tight break-words ${t.heading}`}>{q.prompt}</p>
+        <div className="grid grid-cols-1 gap-3 mb-4">
+          {q.options.map((opt) => {
+            let cls = t.optionBase;
+            if (answered) {
+              if (opt === q.answer) cls = t.optionCorrect;
+              else if (opt === selected) cls = t.optionWrong;
+            }
+            return (
+              <button
+                key={opt}
+                onClick={() => pick(opt)}
+                disabled={answered}
+                className={`w-full rounded-2xl py-3 px-4 text-lg font-semibold border-2 transition break-words active:scale-95 disabled:opacity-100 disabled:active:scale-100 ${cls}`}
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+        {answered && (
+          <p className={`text-sm font-semibold text-center mb-3 ${t.heading}`}>
+            {q.item.name} – {q.item.seat}
+          </p>
+        )}
+        {answered && q.item.note && <p className={`text-xs text-center mb-3 ${t.muted}`}>{q.item.note}</p>}
+        {reaction && (
+          <div className="flex items-center gap-2 mb-4">
+            <Monkey mood={reaction.mood} size={40} />
+            <SpeechBubble t={t}>{reaction.text}</SpeechBubble>
+          </div>
+        )}
+        {answered && (
+          <BigButton t={t} onClick={next}>
+            Tovább
+          </BigButton>
+        )}
+      </div>
+    </Shell>
+  );
+}
+// ---------- TEMP-MEGYEK-END ----------
 
 // ---------- main component ----------
 
@@ -1336,6 +1573,20 @@ function VocabTrainer() {
     setScreen("cards");
   }
 
+  // TEMP-MEGYEK: starts the county flashcards (county on one side, seat on the other).
+  function startCountyCards() {
+    const counties = getCounties();
+    if (counties.length === 0) return;
+    setCardDeck(
+      counties.map((c) => ({
+        word: { en: c.name, hu: c.seat },
+        dir: Math.random() < 0.5 ? "en2hu" : "hu2en",
+      }))
+    );
+    setCardRun((n) => n + 1);
+    setScreen("countyCards");
+  }
+
   async function handleCheckUpdate() {
     setUpdateMsg("Keresés...");
     const latest = await window.fetchLatestVersion();
@@ -1460,7 +1711,8 @@ function VocabTrainer() {
           </div>
           <p className={`mt-3 text-sm ${t.muted}`}>{words.length} szó a listában</p>
         </div>
-        <div className="space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="flex-1 space-y-3">
           <BigButton t={t} tone="accent" onClick={() => setScreen("cardsSetup")}>
             Majomkártyák
           </BigButton>
@@ -1478,6 +1730,26 @@ function VocabTrainer() {
               A Banánpróba még zárva: {greenCount} szó még zöld. Ha mind legalább sárga, megnyílik.
             </p>
           )}
+        </div>
+          {/* TEMP-MEGYEK: county shortcuts (quiz and flashcards) */}
+          <div className="flex flex-col gap-3 shrink-0">
+            <button
+              onClick={() => setScreen("countyQuiz")}
+              aria-label="Megyék tanítás"
+              title="Megyék tanítás"
+              className={`w-14 h-14 rounded-full flex items-center justify-center transition ${t.btn.secondary}`}
+            >
+              <IconPin />
+            </button>
+            <button
+              onClick={startCountyCards}
+              aria-label="Megyék szókártyák"
+              title="Megyék szókártyák"
+              className={`w-14 h-14 rounded-full flex items-center justify-center transition ${t.btn.accent}`}
+            >
+              <IconCity />
+            </button>
+          </div>
         </div>
       </Shell>
     );
@@ -1719,6 +1991,28 @@ function VocabTrainer() {
           )}
         </div>
       </Shell>
+    );
+  }
+
+  // TEMP-MEGYEK: county screens
+  if (screen === "countyQuiz") {
+    return <CountyQuiz t={t} dark={dark} onToggle={toggleDark} onExit={() => setScreen("menu")} />;
+  }
+
+  if (screen === "countyCards") {
+    return (
+      <FlashCards
+        key={"county-" + cardRun}
+        t={t}
+        dark={dark}
+        onToggle={toggleDark}
+        deck={cardDeck}
+        onExit={() => setScreen("menu")}
+        title="Megyék"
+        enLabel="Megye"
+        huLabel="Székhely"
+        endNote="Ez csak gyakorlás volt."
+      />
     );
   }
 
