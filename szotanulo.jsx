@@ -45,32 +45,32 @@ const WHEEL_CONFIG = {
 // Alap szókészlet, ha még nincs mentett szólista.
 // Formátum soronként: "angol szó – magyar jelentés"
 // (A GitHub Pages verzióban ez egy külön words.js fájlban van.)
-const DEFAULT_WORDS_TEXT = `tricks - trükk
-turned flips - szaltó
-juggled - zsonglőrködni
-squeezed - bepréselődni
-brightly - élénken
-yarn - fonál
-all of a sudden - hirtelen
-soared - szárnyalt
-eagle - sas
-backyard - udvar
-mess - rendetlenség
-crayons - zsírkréta
-marbles - üveggolyó
-jar - befőttesüveg
-blocks - építőkockák
-playing hospital - kórházasat játszani
-patient - páciens
-pretended - úgy tett
-fever - láz
-bunk bed - emeletes ágy
-cave - barlang
-shaggy - rongyos
-striped - csíkos
-horns - szarvak
-arrows - nyílvessző
-crooked - ferde`;
+const DEFAULT_WORDS_TEXT = `match - illik hozzá, egyezik
+truck(s) - teherautó, kamion
+carry - vinni, hordani, szállítani
+barrel - hordó
+deliver - kézbesíteni, kiszállítani
+sidewalks - járdák
+water hose - locsolótömlő
+gasoline - benzin
+fable - tanmese
+shadow - árnyék
+crossed over - átkelt, átment
+reflection - tükörkép, visszatükröződés
+snapped - odakapott
+skunk(s) - bűzösborz
+raises - felemel
+liquid - folyadék
+bothers - zavarja, bosszantja
+row - sor
+aisle - (sorok közötti) folyosó
+stacked - egymásra rakott
+tumbled over - felborult, eldőlt
+look just alike - teljesen egyformán néznek ki
+braided - befont, összefont
+recess - (iskolai) szünet
+ribbon - szalag
+jug - kacsó`;
 // ---------- DEFAULT_WORDS_END ----------
 
 // ---------- mascot copy ----------
