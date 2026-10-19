@@ -4,7 +4,35 @@
 // (Ez csak az ALAP készlet: ha az appban a "szólista" menüpontban már elmentettél egy sajátot,
 // ez a fájl utána nem lesz többé figyelembe véve, amíg a böngésző adatait nem törlöd.)
 
-window.DEFAULT_WORDS_TEXT = `tricks - trükk
+window.DEFAULT_WORDS_TEXT = `match - illik hozzá, egyezik
+truck(s) - teherautó, kamion
+carry - vinni, hordani, szállítani
+barrel - hordó
+deliver - kézbesíteni, kiszállítani
+sidewalks - járdák
+water hose - locsolótömlő
+gasoline - benzin
+fable - tanmese
+shadow - árnyék
+crossed over - átkelt, átment
+reflection - tükörkép, visszatükröződés
+snapped - odakapott
+skunk(s) - bűzösborz
+raises - felemel
+liquid - folyadék
+bothers - zavarja, bosszantja
+row - sor
+aisle - (sorok közötti) folyosó
+stacked - egymásra rakott
+tumbled over - felborult, eldőlt
+look just alike - teljesen egyformán néznek ki
+braided - befont, összefont
+recess - (iskolai) szünet
+ribbon - szalag
+jug - kacsó`;
+
+
+/*tricks - trükk
 turned flips - szaltó
 juggled - zsonglőrködni
 squeezed - bepréselődni
@@ -29,10 +57,8 @@ shaggy - rongyos
 striped - csíkos
 horns - szarvak
 arrows - nyílvessző
-crooked - ferde`;
-
-
-/*goodbye – viszlát
+crooked - ferde
+goodbye – viszlát
 bye – szia, viszlát
 good morning – jó reggelt
 good afternoon – jó napot
